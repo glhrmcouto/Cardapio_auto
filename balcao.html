@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AOOBA! — Balcão</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="balcao.css">
+</head>
+<body>
+
+  <!-- ===== HEADER (mesma identidade visual do cardápio) ===== -->
+  <header class="header balcao-header">
+    <nav class="nav container">
+      <span class="nav__logo">AOOBA! <span class="balcao-header__tag">— Balcão</span></span>
+      <span class="balcao-header__contador">Pedidos pendentes: <strong id="contadorPedidos">0</strong></span>
+    </nav>
+  </header>
+
+  <!-- ===== FILA DE PEDIDOS ===== -->
+  <main class="balcao-main container">
+    <div class="fechamento-grid" id="fechamentoGrid">
+      <!-- Cards de fechamento de conta gerados via JS -->
+    </div>
+    <p class="balcao-vazio" id="balcaoVazio">Nenhum pedido pendente no momento.</p>
+    <div class="balcao-grid" id="balcaoGrid">
+      <!-- Cards de pedido gerados via JS -->
+    </div>
+  </main>
+
+  <script src="balcao.js"></script>
+</body>
+</html>

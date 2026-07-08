@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AOOBA! BAR</title>
+
+  <!-- Fontes: Baloo 2 para títulos (estilo bold/arredondado), Poppins para textos -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== BARRA FIXA: NÚMERO DA MESA ===== -->
+  <div class="mesa-bar" id="mesaBar">
+    <label for="mesaInput">Número da mesa:</label>
+    <input type="number" id="mesaInput" min="1" placeholder="Ex: 5" required>
+    <span class="mesa-bar__aviso" id="mesaAviso">Preencha o número da mesa antes de pedir!</span>
+  </div>
+
+  <!-- ===== HEADER FIXO ===== -->
+  <header class="header" id="header">
+    <nav class="nav container">
+      <ul class="nav__links">
+        <li><a href="#sobre">Sobre</a></li>
+        <li><a href="#bebidas">Bebidas</a></li>
+        <li><a href="#narguile">Narguilé</a></li>
+        <li><a href="#essencias">Essências</a></li>
+        <li><a href="#contato">Contato</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- ===== HERO ===== -->
+  <section class="hero">
+    <div class="hero__bg"></div>
+    <div class="hero__content container">
+      <img src="aooba_bar_fundo_escuro.svg" alt="AOOBA! BAR" class="hero__logo">
+      <p class="hero__subtitle">Drinks autorais, narguilé de respeito e a melhor vibe da cidade.</p>
+      <a href="#bebidas" class="btn btn--primary">Ver Cardápio</a>
+    </div>
+    <div class="hero__scroll">
+      <span></span>
+    </div>
+  </section>
+
+  <!-- ===== SOBRE ===== -->
+  <section class="sobre container fade-in" id="sobre">
+    <h2 class="section-title">O Point</h2>
+    <p class="sobre__text">
+      O AOOBA! BAR é o point perfeito pra quem curte um bom drink, um narguilé caprichado
+      e aquela vibe descontraída com os amigos. Ambiente aconchegante, luz baixa, música boa
+      e um atendimento que trata todo mundo como de casa. Aqui o rolê começa cedo e não tem hora pra acabar.
+    </p>
+  </section>
+
+  <!-- ===== CARDÁPIO DE BEBIDAS ===== -->
+  <section class="bebidas container" id="bebidas">
+    <h2 class="section-title fade-in">Cardápio de Bebidas</h2>
+
+    <h3 class="subsection-title fade-in"> Drinks</h3>
+    <div class="cards-grid" id="drinks-grid">
+      <!-- Cards de drinks gerados via JS -->
+    </div>
+
+    <h3 class="subsection-title fade-in"> Cervejas</h3>
+    <div class="cards-grid" id="cervejas-grid">
+      <!-- Cards de cervejas gerados via JS -->
+    </div>
+  </section>
+
+
+
+  <!-- ===== CARDÁPIO DE NARGUILÉ ===== -->
+  <section class="narguile container" id="narguile">
+    <h2 class="section-title fade-in">Cardápio de Narguilé</h2>
+    <p class="narguile__intro fade-in">
+      Nosso narguilé é montado na hora, com carvão natural e essências premium
+      Sence Hookah Tobacco. Escolha sua essência favorita e aproveite tragadas leves e saborosas.
+    </p>
+    <div class="cards-grid" id="narguile-grid">
+      <!-- Cards de narguilé gerados via JS -->
+    </div>
+  </section>
+
+  <!-- ===== ESSÊNCIAS ===== -->
+  <section class="essencias container" id="essencias">
+    <h2 class="section-title fade-in">Sence Hookah Tobacco</h2>
+    <div class="essencias-grid" id="essencias-grid">
+      <!-- Cards de essências gerados via JS -->
+    </div>
+  </section>
+
+  <!-- ===== RODAPÉ ===== -->
+  <footer class="footer" id="contato">
+    <div class="container footer__content">
+      <img src="aooba_bar_fundo_escuro.svg" alt="AOOBA! BAR" class="hero__logo">
+
+      <div class="footer__info">
+        <p>📍 Rua 4. Chácara 1A, Lote 3</p>
+        <p>🕒 Ter a Dom: 18h às 02h | Seg: Fechado</p>
+      </div>
+
+      <div class="footer__socials">
+        <a href="https://instagram.com" target="_blank" rel="noopener" aria-label="Instagram" class="social-icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="2"/>
+            <circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="2"/>
+            <circle cx="17.2" cy="6.8" r="1.2" fill="currentColor"/>
+          </svg>
+        </a>
+        <a href="https://wa.me/5511999999999" target="_blank" rel="noopener" aria-label="WhatsApp" class="social-icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20.5 11.9c0 4.9-4 8.9-8.9 8.9-1.6 0-3.1-.4-4.4-1.2L3 21l1.5-4a8.9 8.9 0 0 1-1.2-4.4c0-4.9 4-8.9 8.9-8.9s8.9 4 8.9 8.9Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 8.7c.1-.3.4-.5.7-.5h.8c.2 0 .4.1.5.4l.6 1.6c.1.2 0 .5-.1.6l-.5.5c-.2.2-.2.4-.1.6.4.7 1.5 1.8 2.2 2.2.2.1.4.1.6-.1l.5-.5c.2-.2.4-.2.6-.1l1.6.6c.2.1.4.3.4.5v.8c0 .3-.2.6-.5.7-.6.2-1.5.3-2.9-.3-1.6-.7-3.2-2.3-3.9-3.9-.6-1.4-.5-2.3-.3-2.9Z" fill="currentColor"/>
+          </svg>
+        </a>
+      </div>
+
+      <p class="footer__copy">&copy; 2026 AOOBA! BAR. Todos os direitos reservados.</p>
+    </div>
+  </footer>
+
+  <!-- ===== CARRINHO DE PEDIDOS (painel lateral flutuante) ===== -->
+  <div class="cart-overlay" id="cartOverlay"></div>
+
+  <aside class="cart-panel" id="cartPanel">
+    <div class="cart-panel__header">
+      <span class="cart-panel__title">Seu Pedido</span>
+      <button class="cart-panel__close" id="cartClose" aria-label="Fechar carrinho">&times;</button>
+    </div>
+    <p class="cart-panel__empty" id="cartEmpty">Seu carrinho está vazio.</p>
+    <div class="cart-panel__items" id="cartItems"></div>
+    <div class="cart-panel__footer">
+      <div class="cart-panel__total">
+        <span>Total</span>
+        <span id="cartTotal">R$ 0,00</span>
+      </div>
+      <button class="btn btn--primary cart-panel__submit" id="cartSubmit">Fazer Pedido</button>
+    </div>
+  </aside>
+
+  <button class="cart-fab" id="cartFab" aria-label="Abrir carrinho">
+    🛒<span class="cart-fab__badge" id="cartBadge">0</span>
+  </button>
+
+  <button class="fechar-conta-fab" id="fecharContaBtn">🧾 Fechar Conta</button>
+
+  <!-- Toast de confirmação -->
+  <div class="toast" id="toast"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
