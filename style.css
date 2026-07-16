@@ -314,6 +314,15 @@ img {
   transition: transform var(--transicao), border-color var(--transicao), box-shadow var(--transicao);
 }
 
+/* .card__img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+} */
+
+
 .card:hover {
   transform: translateY(-6px);
   border-color: var(--laranja);

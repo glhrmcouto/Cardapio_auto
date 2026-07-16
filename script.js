@@ -3,7 +3,7 @@
 // ========================================
 
 const drinks = [
-  { nome: 'Caipirinha', desc: 'Cachaça, limão fresco, açúcar e gelo na medida certa.', preco: 18 },
+  { nome: 'Caipirinha', desc: 'Cachaça, limão fresco, açúcar e gelo na medida certa.', preco: 18, /* imagem: 'img/Caipirinha.jpg' */ },
   { nome: 'Moscow Mule', desc: 'Vodka, gengibre, limão e ginger beer geladinha.', preco: 24 },
   { nome: 'Gin Tônica', desc: 'Gin premium, tônica artesanal e toque cítrico.', preco: 26 },
   { nome: 'Aperol Spritz', desc: 'Aperol, espumante e um splash de água com gás.', preco: 28 },
@@ -61,11 +61,12 @@ function formatarPreco(valor) {
 
 // Cria o HTML de um card de bebida/narguilé e injeta no container
 // (data-nome/data-preco no botão são lidos pelo carrinho na seção de pedidos, mais abaixo)
+// <img class="card__img" src="${item.imagem}" alt="${item.nome}" loading="lazy">
 function renderizarCardsBebida(lista, containerId) {
   const container = document.getElementById(containerId);
   container.innerHTML = lista.map(item => `
     <div class="card fade-in">
-      <div class="card__header">
+      <div class="card__header">     
         <span class="card__name">${item.nome}</span>
         <span class="card__price">${formatarPreco(item.preco)}</span>
       </div>
