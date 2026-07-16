@@ -23,6 +23,17 @@
   color: var(--laranja-forte);
 }
 
+.balcao-header__acoes {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.balcao-header__historico {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.85rem;
+}
+
 .balcao-main {
   padding: 7rem 1.25rem 3rem;
   min-height: 100vh;
@@ -162,4 +173,63 @@
   align-self: flex-end;
   font-size: 0.95rem;
   padding: 0.6rem 1.6rem;
+}
+
+/*MODAL: HISTÓRICO DE PEDIDOS*/
+.modal-panel--historico {
+  width: min(560px, 92vw);
+}
+
+.historico-pedido {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.historico-pedido:last-child {
+  border-bottom: none;
+}
+
+.historico-pedido__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.historico-pedido__mesa {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  color: var(--laranja-forte);
+}
+
+.historico-pedido__horario {
+  color: var(--cinza-claro);
+  font-size: 0.8rem;
+}
+
+.historico-pedido__status {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 50px;
+  align-self: flex-start;
+}
+
+.historico-pedido__status--pendente {
+  color: var(--laranja-forte);
+  background: rgba(245, 119, 46, 0.15);
+}
+
+.historico-pedido__status--entregue {
+  color: #6bd97a;
+  background: rgba(107, 217, 122, 0.15);
+}
+
+.historico-pedido__status--finalizado {
+  color: var(--cinza-claro);
+  background: rgba(255, 255, 255, 0.08);
 }

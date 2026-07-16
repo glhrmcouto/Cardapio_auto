@@ -15,6 +15,15 @@ const balcaoVazio = document.getElementById('balcaoVazio');
 const contadorPedidos = document.getElementById('contadorPedidos');
 const fechamentoGrid = document.getElementById('fechamentoGrid');
 
+const historicoBtn = document.getElementById('historicoBtn');
+const historicoOverlay = document.getElementById('historicoOverlay');
+const historicoModal = document.getElementById('historicoModal');
+const historicoLista = document.getElementById('historicoLista');
+const historicoVazio = document.getElementById('historicoVazio');
+const historicoClose = document.getElementById('historicoClose');
+const historicoFiltroData = document.getElementById('historicoFiltroData');
+const historicoFiltroLimpar = document.getElementById('historicoFiltroLimpar');
+
 let pedidos = []; // só os pedidos com status "pendente"
 let fechamentos = []; // pedidos de "fechar conta" ainda não atendidos
 
@@ -24,6 +33,19 @@ function formatarPreco(valor) {
 
 function formatarHorario(iso) {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatarData(iso) {
+  return new Date(iso).toLocaleDateString('pt-BR');
+}
+
+// Data local no formato yyyy-mm-dd, pra comparar com o valor do <input type="date">
+function obterDataLocal(iso) {
+  const d = new Date(iso);
+  const ano = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
 }
 
 // Toca um beep curto (Web Audio API, sem precisar de arquivo de áudio) quando chega pedido novo
@@ -199,6 +221,82 @@ canalPedidos.onmessage = (event) => {
   renderizarPedidos();
   tocarBeep();
 };
+
+// ========================================
+// HISTÓRICO DE PEDIDOS
+// ========================================
+
+const statusLabel = {
+  pendente: 'Pendente',
+  entregue: 'Entregue',
+  finalizado: 'Finalizado',
+};
+
+// Lê todos os pedidos já feitos (qualquer status), do mais recente pro mais antigo
+function carregarHistorico() {
+  const salvos = JSON.parse(localStorage.getItem('aooba_pedidos') || '[]');
+  return salvos
+    .filter(pedido => pedido.tipo === 'pedido' || !pedido.tipo)
+    .sort((a, b) => new Date(b.horario) - new Date(a.horario));
+}
+
+function renderizarHistorico() {
+  const filtro = historicoFiltroData.value;
+  let historico = carregarHistorico();
+
+  if (filtro) {
+    historico = historico.filter(pedido => obterDataLocal(pedido.horario) === filtro);
+  }
+
+  if (historico.length === 0) {
+    historicoVazio.textContent = filtro
+      ? 'Nenhum pedido registrado nessa data.'
+      : 'Nenhum pedido registrado ainda.';
+    historicoVazio.style.display = 'block';
+    historicoLista.innerHTML = '';
+    return;
+  }
+
+  historicoVazio.style.display = 'none';
+  historicoLista.innerHTML = historico.map(pedido => `
+    <div class="historico-pedido">
+      <div class="historico-pedido__header">
+        <span class="historico-pedido__mesa">Mesa ${pedido.mesa}</span>
+        <span class="historico-pedido__horario">${formatarData(pedido.horario)} às ${formatarHorario(pedido.horario)}</span>
+      </div>
+      <span class="historico-pedido__status historico-pedido__status--${pedido.status}">${statusLabel[pedido.status] || pedido.status}</span>
+      <ul class="pedido-card__itens">
+        ${pedido.itens.map(item => `
+          <li>
+            <span>${item.quantidade}x ${item.nome}</span>
+            <span>${formatarPreco(item.preco * item.quantidade)}</span>
+          </li>
+        `).join('')}
+      </ul>
+      <div class="pedido-card__total">Total: ${formatarPreco(pedido.total)}</div>
+    </div>
+  `).join('');
+}
+
+function abrirHistorico() {
+  renderizarHistorico();
+  historicoOverlay.classList.add('is-open');
+  historicoModal.classList.add('is-open');
+}
+
+function fecharHistorico() {
+  historicoOverlay.classList.remove('is-open');
+  historicoModal.classList.remove('is-open');
+}
+
+historicoBtn.addEventListener('click', abrirHistorico);
+historicoClose.addEventListener('click', fecharHistorico);
+historicoOverlay.addEventListener('click', fecharHistorico);
+historicoFiltroData.addEventListener('change', renderizarHistorico);
+historicoFiltroLimpar.addEventListener('click', () => {
+  historicoFiltroData.value = '';
+  renderizarHistorico();
+});
 
 carregarPedidosDoStorage();
 renderizarPedidos();

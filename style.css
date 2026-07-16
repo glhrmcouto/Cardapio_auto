@@ -846,6 +846,9 @@ img {
 .modal-panel__itens {
   flex: 1;
   overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 0.6rem;
+  margin-right: -0.6rem;
   margin-bottom: 1rem;
 }
 
@@ -857,6 +860,45 @@ img {
   padding: 0.6rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 0.92rem;
+}
+
+.modal-panel__filtro {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: var(--cinza-claro);
+}
+
+.modal-panel__filtro input[type="date"] {
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--preto);
+  color: var(--branco);
+  font-family: var(--fonte-texto);
+  font-size: 0.85rem;
+  color-scheme: dark;
+}
+
+.modal-panel__filtro input[type="date"]::-webkit-calendar-picker-indicator {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FF7A1A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+.modal-panel__filtro-limpar {
+  background: none;
+  border: none;
+  color: var(--laranja-forte);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .modal-panel__total {
