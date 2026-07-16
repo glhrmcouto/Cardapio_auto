@@ -1,0 +1,165 @@
+/* ========================================
+   TELA DO BALCÃO
+   (reaproveita as variáveis e classes de style.css:
+   .header, .nav, .container, .btn, .btn--primary etc.)
+======================================== */
+
+.balcao-header {
+  top: 0; /* aqui não existe a barra de "número da mesa" do cardápio */
+}
+
+.balcao-header__tag {
+  color: var(--branco);
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.balcao-header__contador {
+  color: var(--cinza-claro);
+  font-size: 0.9rem;
+}
+
+.balcao-header__contador strong {
+  color: var(--laranja-forte);
+}
+
+.balcao-main {
+  padding: 7rem 1.25rem 3rem;
+  min-height: 100vh;
+}
+
+.balcao-vazio {
+  text-align: center;
+  color: var(--cinza-claro);
+  font-size: 1.1rem;
+  padding: 4rem 0;
+}
+
+.balcao-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.pedido-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.4rem;
+  background: var(--preto-2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 5px solid var(--laranja);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  animation: pedido-entra 0.4s ease;
+}
+
+@keyframes pedido-entra {
+  from { opacity: 0; transform: translateY(-14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pedido-card__mesa {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  font-size: 2rem;
+  color: var(--laranja-forte);
+}
+
+.pedido-card__horario {
+  color: var(--cinza-claro);
+  font-size: 0.85rem;
+}
+
+.pedido-card__itens {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pedido-card__itens li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.92rem;
+}
+
+.pedido-card__itens li span:first-child {
+  color: var(--branco);
+}
+
+.pedido-card__itens li span:last-child {
+  color: var(--cinza-claro);
+}
+
+.pedido-card__total {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  color: var(--laranja);
+  text-align: right;
+}
+
+.pedido-card__entregar {
+  align-self: flex-end;
+  font-size: 0.95rem;
+  padding: 0.6rem 1.6rem;
+}
+
+/* ========================================
+   FECHAMENTO DE CONTA
+   (alerta destacado, diferente dos cards de pedido)
+======================================== */
+.fechamento-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.fechamento-grid:empty {
+  display: none;
+  margin-bottom: 0;
+}
+
+.fechamento-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1.4rem;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  border-left: 5px solid #ff6b6b;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(255, 107, 107, 0.25);
+  animation: pedido-entra 0.4s ease;
+}
+
+.fechamento-card__icon {
+  font-size: 1.8rem;
+}
+
+.fechamento-card__mesa {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  font-size: 1.5rem;
+  color: #ff6b6b;
+  letter-spacing: 0.3px;
+}
+
+.fechamento-card__horario {
+  color: var(--cinza-claro);
+  font-size: 0.85rem;
+}
+
+.fechamento-card__total {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--laranja);
+}
+
+.fechamento-card__fechar {
+  align-self: flex-end;
+  font-size: 0.95rem;
+  padding: 0.6rem 1.6rem;
+}
