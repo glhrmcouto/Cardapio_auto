@@ -284,7 +284,7 @@ img {
   line-height: 1.8;
 }
 
-/*CARDS (drinks, cervejas, narguilé)*/
+/*CARDS (drinks, cervejas, narguile)*/
 .bebidas,
 .narguile,
 .semAlcool {
@@ -357,7 +357,7 @@ img {
   line-height: 1.6;
 }
 
-/* Botão "Adicionar" usado nos cards de drinks, cervejas, narguilé e essências */
+/* Botão "Adicionar" usado nos cards de drinks, cervejas, narguile e essências */
 .btn--add {
   display: block;
   width: 100%;

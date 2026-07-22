@@ -23,17 +23,17 @@ const cervejas = [
 ];
 
 const narguile = [
-  { nome: 'Narguilé Completo', desc: 'Montagem completa com essência à sua escolha.', preco: 45 },
+  { nome: 'Narguile Completo', desc: 'Montagem completa com essência à sua escolha.', preco: 45 },
   { nome: 'Troca de Rosh', desc: 'Rosh novo com essência renovada.', preco: 20 },
   { nome: 'Carvão Extra', desc: 'Porção adicional de carvão natural.', preco: 8 },
-  { nome: 'Essência Dupla', desc: 'Mescla de duas essências no mesmo narguilé.', preco: 10 },
+  { nome: 'Essência Dupla', desc: 'Mescla de duas essências no mesmo narguile.', preco: 10 },
 ];
 
 const semAlcool = [
   { nome: 'Refrigerante Lata', desc: 'Coca, Guaraná, Fanta ou Sprite gelados.', preco: 7 },
   { nome: 'Suco Natural', desc: 'Feito na hora: laranja, abacaxi ou maracujá.', preco: 12 },
   { nome: 'Água Mineral', desc: 'Com ou sem gás, 500ml gelada.', preco: 5 },
-  { nome: 'Energético', desc: 'Lata gelada, ideal pra acompanhar o narguilé.', preco: 15 },
+  { nome: 'Energético', desc: 'Lata gelada, ideal pra acompanhar o narguile.', preco: 15 },
 ]
 
 
@@ -59,7 +59,7 @@ function formatarPreco(valor) {
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-// Cria o HTML de um card de bebida/narguilé e injeta no container
+// Cria o HTML de um card de bebida/narguile e injeta no container
 // (data-nome/data-preco no botão são lidos pelo carrinho na seção de pedidos, mais abaixo)
 // <img class="card__img" src="${item.imagem}" alt="${item.nome}" loading="lazy">
 function renderizarCardsBebida(lista, containerId) {
@@ -77,7 +77,7 @@ function renderizarCardsBebida(lista, containerId) {
 }
 
 // Cria o HTML de um card de essência e injeta no container
-// Essências não têm preço próprio no cardápio (o custo já está no narguilé),
+// Essências não têm preço próprio no cardápio (o custo já está no narguile),
 // então entram no carrinho com preço 0 — servem só pra registrar a escolha do cliente.
 function renderizarCardsEssencia(lista, containerId) {
   const container = document.getElementById(containerId);
