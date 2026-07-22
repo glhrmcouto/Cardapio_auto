@@ -312,10 +312,14 @@ const fecharContaCancelar = document.getElementById('fecharContaCancelar');
 const fecharContaConfirmar = document.getElementById('fecharContaConfirmar');
 
 // Junta todos os pedidos já feitos pela mesa e agrupa os itens (somando quantidades repetidas)
+// Ignora pedidos "finalizado" (conta já fechada antes) pra uma mesa reaproveitada não
+// arrastar o consumo de clientes anteriores.
 function obterContaDaMesa(mesa) {
   const salvos = JSON.parse(localStorage.getItem('aooba_pedidos') || '[]');
   const pedidosDaMesa = salvos.filter(pedido =>
-    (pedido.tipo === 'pedido' || !pedido.tipo) && String(pedido.mesa) === String(mesa)
+    (pedido.tipo === 'pedido' || !pedido.tipo) &&
+    String(pedido.mesa) === String(mesa) &&
+    pedido.status !== 'finalizado'
   );
 
   const itensAgrupados = {};
@@ -385,9 +389,14 @@ function confirmarFecharConta() {
     tipo: 'fechar_conta',
     mesa,
     horario: new Date().toISOString(),
+    status: 'pendente',
   };
 
-  canalPedidos.postMessage(fechamento);
+  canalPedidos.postMessage(fechamento); // avisa o balcão na hora, se estiver aberto
+  // Salva na mesma lista 'aooba_pedidos' (reaproveitando salvarPedidoNoStorage) já que o
+  // objeto tem tipo: 'fechar_conta' pra se distinguir dos pedidos normais — assim o balcão
+  // recupera o pedido de fechamento mesmo se a tela estiver fechada ou for recarregada.
+  salvarPedidoNoStorage(fechamento);
 
   fecharModalFecharConta();
   mostrarToast('Pedido de fechamento enviado! O garçom já foi avisado.');

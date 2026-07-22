@@ -48,21 +48,68 @@ function obterDataLocal(iso) {
   return `${ano}-${mes}-${dia}`;
 }
 
-// Toca um beep curto (Web Audio API, sem precisar de arquivo de áudio) quando chega pedido novo
-function tocarBeep() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.frequency.value = 880;
-    gain.gain.value = 0.15;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.18);
-  } catch (erro) {
-    // Alguns navegadores bloqueiam áudio sem interação prévia do usuário; ignora nesse caso.
+const ativarSomBtn = document.getElementById('ativarSomBtn');
+const somAvisoEl = document.getElementById('somAviso');
+
+// Um único AudioContext reaproveitado em todos os beeps — criar um novo a cada chamada
+// esgota o limite de contextos simultâneos do navegador e o áudio acaba morrendo.
+let audioCtx = null;
+
+function obterAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
+  return audioCtx;
+}
+
+// Toca um único tom (Web Audio API, sem precisar de arquivo de áudio)
+function tocarTom(ctx, frequencia, atraso, duracao) {
+  const inicio = ctx.currentTime + atraso;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.frequency.value = frequencia;
+  gain.gain.value = 0.15;
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(inicio);
+  osc.stop(inicio + duracao);
+}
+
+// Mostra um aviso discreto no header pedindo pra ativar o som
+function mostrarAvisoSom() {
+  if (somAvisoEl) somAvisoEl.classList.add('show');
+}
+
+// Toca o beep de "pedido novo" (agudo, único) ou de "fechar conta" (mais grave e duplo).
+// O contexto nasce "suspended" (a tela abre sem interação do usuário) — nesse caso,
+// em vez de engolir o erro em silêncio, mostra o aviso pra o garçom clicar em "Ativar som".
+function tocarBeep(tipo = 'pedido') {
+  const ctx = obterAudioContext();
+
+  if (ctx.state === 'suspended') {
+    mostrarAvisoSom();
+    return;
+  }
+
+  if (tipo === 'fechamento') {
+    tocarTom(ctx, 440, 0, 0.16);
+    tocarTom(ctx, 440, 0.22, 0.16);
+  } else {
+    tocarTom(ctx, 880, 0, 0.18);
+  }
+}
+
+// Ao clicar, "destrava" o AudioContext (resume) e confirma com um beep de teste
+if (ativarSomBtn) {
+  ativarSomBtn.addEventListener('click', () => {
+    const ctx = obterAudioContext();
+    ctx.resume().then(() => {
+      tocarTom(ctx, 880, 0, 0.18);
+      ativarSomBtn.textContent = '🔔 Som ativo';
+      ativarSomBtn.disabled = true;
+      if (somAvisoEl) somAvisoEl.classList.remove('show');
+    });
+  });
 }
 
 // Carrega do localStorage só os pedidos que ainda estão pendentes, do mais antigo pro mais novo
@@ -85,21 +132,29 @@ function atualizarStatusNoStorage(id, novoStatus) {
   localStorage.setItem('aooba_pedidos', JSON.stringify(atualizados));
 }
 
-// Soma o total de todos os pedidos (qualquer status) feitos por uma mesa,
-// pra o garçom saber quanto cobrar ao fechar a conta
+// Soma o total dos pedidos ainda ativos (pendente/entregue) feitos por uma mesa,
+// pra o garçom saber quanto cobrar ao fechar a conta.
+// Ignora "finalizado" senão uma mesa reaproveitada soma o consumo de clientes anteriores.
 function calcularTotalMesa(mesa) {
   const salvos = JSON.parse(localStorage.getItem('aooba_pedidos') || '[]');
   return salvos
-    .filter(pedido => (pedido.tipo === 'pedido' || !pedido.tipo) && String(pedido.mesa) === String(mesa))
+    .filter(pedido =>
+      (pedido.tipo === 'pedido' || !pedido.tipo) &&
+      String(pedido.mesa) === String(mesa) &&
+      pedido.status !== 'finalizado'
+    )
     .reduce((soma, pedido) => soma + pedido.total, 0);
 }
 
-// Junta todos os itens pedidos por uma mesa e agrupa por nome (somando quantidades repetidas),
-// pra o garçom ver o que foi consumido antes de fechar a conta
+// Junta os itens dos pedidos ainda ativos (pendente/entregue) de uma mesa e agrupa por nome
+// (somando quantidades repetidas), pra o garçom ver o que foi consumido antes de fechar a conta.
+// Ignora "finalizado" pelo mesmo motivo de calcularTotalMesa.
 function obterItensDaMesa(mesa) {
   const salvos = JSON.parse(localStorage.getItem('aooba_pedidos') || '[]');
   const pedidosDaMesa = salvos.filter(pedido =>
-    (pedido.tipo === 'pedido' || !pedido.tipo) && String(pedido.mesa) === String(mesa)
+    (pedido.tipo === 'pedido' || !pedido.tipo) &&
+    String(pedido.mesa) === String(mesa) &&
+    pedido.status !== 'finalizado'
   );
 
   const itensAgrupados = {};
@@ -113,6 +168,32 @@ function obterItensDaMesa(mesa) {
   });
 
   return Object.values(itensAgrupados);
+}
+
+// Conta quantos pedidos de uma mesa ainda estão "pendente" (não entregues),
+// pra avisar o garçom antes de fechar a conta e apagar esses pedidos da fila
+function contarPedidosPendentesDaMesa(mesa) {
+  const salvos = JSON.parse(localStorage.getItem('aooba_pedidos') || '[]');
+  return salvos.filter(pedido =>
+    (pedido.tipo === 'pedido' || !pedido.tipo) &&
+    String(pedido.mesa) === String(mesa) &&
+    pedido.status === 'pendente'
+  ).length;
+}
+
+// Carrega do localStorage só os fechamentos de conta ainda pendentes
+function carregarFechamentosDoStorage() {
+  const salvos = JSON.parse(localStorage.getItem('aooba_pedidos') || '[]');
+  fechamentos = salvos.filter(item => item.tipo === 'fechar_conta' && item.status === 'pendente');
+}
+
+// Atualiza o status de um fechamento salvo (usado quando o garçom marca a conta como atendida)
+function atualizarStatusFechamentoNoStorage(id, novoStatus) {
+  const salvos = JSON.parse(localStorage.getItem('aooba_pedidos') || '[]');
+  const atualizados = salvos.map(item =>
+    item.id === id && item.tipo === 'fechar_conta' ? { ...item, status: novoStatus } : item
+  );
+  localStorage.setItem('aooba_pedidos', JSON.stringify(atualizados));
 }
 
 // Marca todos os pedidos de uma mesa como "finalizado" (chamado ao fechar a conta)
@@ -171,11 +252,13 @@ balcaoGrid.addEventListener('click', (event) => {
 function renderizarFechamentos() {
   fechamentoGrid.innerHTML = fechamentos.map(fechamento => {
     const itens = obterItensDaMesa(fechamento.mesa);
+    const pendentes = contarPedidosPendentesDaMesa(fechamento.mesa);
     return `
     <div class="fechamento-card" data-id="${fechamento.id}">
       <span class="fechamento-card__icon">⚠️</span>
       <div class="fechamento-card__mesa">MESA ${fechamento.mesa} — FECHAR CONTA</div>
       <div class="fechamento-card__horario">${formatarHorario(fechamento.horario)}</div>
+      ${pendentes > 0 ? `<div class="fechamento-card__aviso-pendente">⚠️ Esta mesa tem ${pendentes} pedido(s) ainda não entregue(s)</div>` : ''}
       <ul class="pedido-card__itens">
         ${itens.map(item => `
           <li>
@@ -191,12 +274,28 @@ function renderizarFechamentos() {
   }).join('');
 }
 
-// Remove o alerta da tela e marca os pedidos da mesa como finalizados
+// Remove o alerta da tela, marca os pedidos da mesa como finalizados e tira da fila em
+// memória os pedidos que ainda estavam pendentes (senão a tela fica dessincronizada do storage)
 function finalizarFechamento(id) {
   const fechamento = fechamentos.find(f => f.id === id);
+  if (!fechamento) return;
+
+  const pendentes = contarPedidosPendentesDaMesa(fechamento.mesa);
+  if (pendentes > 0) {
+    const confirmou = confirm(
+      `Mesa ${fechamento.mesa} tem ${pendentes} pedido(s) ainda não entregue(s). Fechar a conta mesmo assim?`
+    );
+    if (!confirmou) return;
+  }
+
   fechamentos = fechamentos.filter(f => f.id !== id);
   renderizarFechamentos();
-  if (fechamento) marcarPedidosMesaComoFinalizados(fechamento.mesa);
+
+  marcarPedidosMesaComoFinalizados(fechamento.mesa);
+  atualizarStatusFechamentoNoStorage(id, 'atendido');
+
+  pedidos = pedidos.filter(pedido => String(pedido.mesa) !== String(fechamento.mesa));
+  renderizarPedidos();
 }
 
 fechamentoGrid.addEventListener('click', (event) => {
@@ -210,16 +309,17 @@ canalPedidos.onmessage = (event) => {
   const dados = event.data;
 
   if (dados.tipo === 'fechar_conta') {
+    if (fechamentos.some(f => f.id === dados.id)) return; // evita duplicar se já veio do storage
     fechamentos.push(dados);
     renderizarFechamentos();
-    tocarBeep();
+    tocarBeep('fechamento');
     return;
   }
 
   pedidos.push(dados);
   ordenarPedidos();
   renderizarPedidos();
-  tocarBeep();
+  tocarBeep('pedido');
 };
 
 // ========================================
@@ -299,5 +399,6 @@ historicoFiltroLimpar.addEventListener('click', () => {
 });
 
 carregarPedidosDoStorage();
+carregarFechamentosDoStorage();
 renderizarPedidos();
 renderizarFechamentos();

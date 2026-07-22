@@ -34,6 +34,22 @@
   font-size: 0.85rem;
 }
 
+.balcao-header__som {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.85rem;
+}
+
+.balcao-header__som-aviso {
+  display: none;
+  color: #ff6b6b;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.balcao-header__som-aviso.show {
+  display: inline-block;
+}
+
 .balcao-main {
   padding: 7rem 1.25rem 3rem;
   min-height: 100vh;
@@ -160,6 +176,12 @@
 .fechamento-card__horario {
   color: var(--cinza-claro);
   font-size: 0.85rem;
+}
+
+.fechamento-card__aviso-pendente {
+  color: #ff6b6b;
+  font-size: 0.85rem;
+  font-weight: 700;
 }
 
 .fechamento-card__total {
