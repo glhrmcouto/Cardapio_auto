@@ -10,6 +10,7 @@
 // aparelho (celular do cliente fazendo pedido enquanto o balcão fica no PC).
 
 import { supabase } from './supabaseClient.js';
+import { formatarPreco, formatarDataISO, calcularTaxaServico } from './shared.js';
 
 // ========================================
 // ELEMENTOS
@@ -26,6 +27,8 @@ const balcaoConteudo = document.getElementById('balcaoConteudo');
 const sairBtn = document.getElementById('sairBtn');
 const conexaoStatusEl = document.getElementById('conexaoStatus');
 
+const balcaoErroEl = document.getElementById('balcaoErro');
+const balcaoTentarBtn = document.getElementById('balcaoTentar');
 const balcaoGrid = document.getElementById('balcaoGrid');
 const balcaoVazio = document.getElementById('balcaoVazio');
 const contadorPedidos = document.getElementById('contadorPedidos');
@@ -43,10 +46,6 @@ const historicoFiltroLimpar = document.getElementById('historicoFiltroLimpar');
 let pedidos = []; // só os pedidos com status "pendente" — cada um já vem com .itens embutido
 let fechamentos = []; // pedidos de "fechar conta" ainda não atendidos
 
-function formatarPreco(valor) {
-  return Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
 function formatarHorario(iso) {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
@@ -57,11 +56,7 @@ function formatarData(iso) {
 
 // Data local no formato yyyy-mm-dd, pra comparar com o valor do <input type="date">
 function obterDataLocal(iso) {
-  const d = new Date(iso);
-  const ano = d.getFullYear();
-  const mes = String(d.getMonth() + 1).padStart(2, '0');
-  const dia = String(d.getDate()).padStart(2, '0');
-  return `${ano}-${mes}-${dia}`;
+  return formatarDataISO(new Date(iso));
 }
 
 // ========================================
@@ -263,6 +258,10 @@ if (ativarSomBtn) {
 // apelidando as colunas pra "nome"/"preco" — assim o resto do arquivo (os templates
 // de card) fica idêntico ao que já era antes, só trocando de onde os dados vêm.
 
+// Lançam o erro em vez de engolir (pedidos = []) de propósito: um balcão que
+// mostra "nenhum pedido pendente" porque a consulta falhou é pior que não
+// mostrar nada — o garçom lê aquilo como "salão vazio" e pode deixar cliente
+// esperando. Quem decide o que fazer com a falha é carregarTudoInicial.
 async function carregarPedidosPendentes() {
   const { data, error } = await supabase
     .from('pedidos')
@@ -271,11 +270,7 @@ async function carregarPedidosPendentes() {
     .eq('status', 'pendente')
     .order('criado_em', { ascending: true });
 
-  if (error) {
-    console.error('Erro ao carregar pedidos pendentes:', error);
-    pedidos = [];
-    return;
-  }
+  if (error) throw error;
   pedidos = data;
 }
 
@@ -287,28 +282,41 @@ async function carregarFechamentosPendentes() {
     .eq('status', 'pendente')
     .order('criado_em', { ascending: true });
 
-  if (error) {
-    console.error('Erro ao carregar fechamentos pendentes:', error);
-    fechamentos = [];
-    return;
-  }
+  if (error) throw error;
   fechamentos = data;
 }
 
 async function carregarTudoInicial() {
-  await Promise.all([carregarPedidosPendentes(), carregarFechamentosPendentes()]);
+  balcaoErroEl.style.display = 'none';
+
+  try {
+    await Promise.all([carregarPedidosPendentes(), carregarFechamentosPendentes()]);
+  } catch (erro) {
+    console.error('Erro ao carregar pedidos/fechamentos:', erro);
+    balcaoGrid.innerHTML = '';
+    fechamentoGrid.innerHTML = '';
+    balcaoVazio.style.display = 'none';
+    balcaoErroEl.style.display = 'block';
+    return;
+  }
+
   renderizarPedidos();
   await renderizarFechamentos();
 }
+
+balcaoTentarBtn.addEventListener('click', carregarTudoInicial);
 
 function ordenarPedidos() {
   pedidos.sort((a, b) => new Date(a.criado_em) - new Date(b.criado_em));
 }
 
-// Itens + total consolidado de uma mesa, olhando só pedidos 'pendente' ou 'entregue'
-// (nunca 'finalizado' — senão o consumo do cliente anterior apareceria pro próximo).
-// O balcão é "authenticated", então lê a tabela direto (não precisa da RPC conta_da_mesa,
-// que existe só pra liberar o cliente anônimo).
+// Itens + subtotal + taxa de serviço (10%) + total consolidado de uma mesa,
+// olhando só pedidos 'pendente' ou 'entregue' (nunca 'finalizado' — senão o
+// consumo do cliente anterior apareceria pro próximo). O balcão é
+// "authenticated", então lê a tabela direto (não precisa da RPC
+// conta_da_mesa, que existe só pra liberar o cliente anônimo) — por isso a
+// taxa é calculada aqui também, e não só na RPC (ver
+// supabase/006_taxa_servico.sql e shared.js).
 async function obterContaAtivaDaMesa(mesa) {
   const { data, error } = await supabase
     .from('pedido_itens')
@@ -319,7 +327,7 @@ async function obterContaAtivaDaMesa(mesa) {
 
   if (error) {
     console.error('Erro ao consultar itens da mesa:', error);
-    return { itens: [], total: 0 };
+    return { itens: [], subtotal: 0, taxaServico: 0, total: 0 };
   }
 
   const agrupados = {};
@@ -332,8 +340,9 @@ async function obterContaAtivaDaMesa(mesa) {
   });
 
   const itens = Object.values(agrupados);
-  const total = itens.reduce((soma, item) => soma + item.preco * item.quantidade, 0);
-  return { itens, total };
+  const subtotal = itens.reduce((soma, item) => soma + item.preco * item.quantidade, 0);
+  const taxaServico = calcularTaxaServico(subtotal);
+  return { itens, subtotal, taxaServico, total: subtotal + taxaServico };
 }
 
 // ========================================
@@ -425,6 +434,10 @@ async function renderizarFechamentos() {
           </li>
         `).join('')}
       </ul>
+      <div class="fechamento-card__resumo">
+        <div class="fechamento-card__linha"><span>Subtotal</span><span>${formatarPreco(conta.subtotal)}</span></div>
+        <div class="fechamento-card__linha"><span>Taxa de serviço (10%)</span><span>${formatarPreco(conta.taxaServico)}</span></div>
+      </div>
       <div class="fechamento-card__total">Total a cobrar: ${formatarPreco(conta.total)}</div>
       <button class="btn btn--primary fechamento-card__fechar" data-id="${fechamento.id}">Conta Fechada</button>
     </div>
@@ -486,7 +499,7 @@ fechamentoGrid.addEventListener('click', (event) => {
 });
 
 // ========================================
-// REALTIME (Supabase) — substitui o antigo BroadcastChannel
+// REALTIME (Supabase)
 // ========================================
 
 let canalRealtime = null;

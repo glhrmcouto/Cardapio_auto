@@ -1,13 +1,36 @@
 import { supabase } from './supabaseClient.js';
+import { formatarPreco } from './shared.js';
 
 // ========================================
-// FORMATAÇÃO
+// AVISO DE SEM CONEXÃO
 // ========================================
+//
+// navigator.onLine reflete a interface de rede do aparelho (wifi/dados),
+// não se o Supabase especificamente está no ar — mas cobre o caso mais comum
+// no salão de um bar (celular do cliente perdendo sinal), e o pedido em si
+// já tem seu próprio aviso de erro se falhar por outro motivo (ver fazerPedido).
 
-// Formata número em Real brasileiro
-function formatarPreco(valor) {
-  return Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const offlineAvisoEl = document.getElementById('offlineAviso');
+
+function atualizarAvisoOffline() {
+  const offline = !navigator.onLine;
+  offlineAvisoEl.classList.toggle('show', offline);
+  document.body.classList.toggle('is-offline', offline);
 }
+
+// Mede a altura real do aviso (ele nunca sai do fluxo com display:none, só
+// desliza pra fora da tela — ver .offline-aviso em style.css), pra barra da
+// mesa/header descerem exatamente o espaço certo, mesmo se o texto quebrar
+// em duas linhas numa tela estreita.
+function medirAlturaOffline() {
+  document.documentElement.style.setProperty('--offline-altura', `${offlineAvisoEl.offsetHeight}px`);
+}
+
+window.addEventListener('online', atualizarAvisoOffline);
+window.addEventListener('offline', atualizarAvisoOffline);
+window.addEventListener('resize', medirAlturaOffline);
+medirAlturaOffline();
+atualizarAvisoOffline();
 
 // ========================================
 // CARREGAMENTO DO CARDÁPIO (Supabase)
@@ -140,20 +163,27 @@ observarFadeIns();
 // (o preço que vale de verdade é recalculado dentro da RPC criar_pedido, no banco,
 // então mesmo que alguém adultere esses valores no navegador, o pedido grava certo).
 //
-// Pedido e fechamento de conta não passam mais por BroadcastChannel/localStorage:
-// vão direto pro Supabase (RPCs criar_pedido / pedir_fechamento) e a tela do
-// balcão os recebe por ali (leitura + Realtime), então funciona entre aparelhos
-// diferentes (celular do cliente + PC do balcão).
+// Pedido e fechamento de conta vão direto pro Supabase (RPCs criar_pedido /
+// pedir_fechamento) e a tela do balcão os recebe por ali (leitura + Realtime),
+// então funciona entre aparelhos diferentes (celular do cliente + PC do balcão).
 
 let carrinho = []; // cada item: { produtoId, nome, preco, quantidade }
 
 const mesaInput = document.getElementById('mesaInput');
 const mesaAviso = document.getElementById('mesaAviso');
 
-// Se a página abrir com ?mesa=5 na URL (QR code na mesa), pré-preenche o campo e
-// TRANCA ele (readonly) — o cliente não deve poder trocar de mesa manualmente
-// quando ela já veio do QR code físico da própria mesa.
-const mesaDaUrl = new URLSearchParams(window.location.search).get('mesa');
+// Se a página abrir com ?mesa=5&t=TOKEN na URL (QR code na mesa), pré-preenche
+// o campo e TRANCA ele (readonly) — o cliente não deve poder trocar de mesa
+// manualmente quando ela já veio do QR code físico da própria mesa.
+//
+// O token não tem campo nem UI própria: ele só existe pra ser repassado pra
+// criar_pedido/pedir_fechamento (ver supabase/005_seguranca.sql), que recusam
+// qualquer pedido cujo token não bata com o da mesa — sem ele (ex.: alguém
+// digitando a URL só com ?mesa= manualmente, sem ter escaneado o QR físico),
+// o pedido é recusado no banco, mesmo que o número da mesa exista de verdade.
+const paramsUrl = new URLSearchParams(window.location.search);
+const mesaDaUrl = paramsUrl.get('mesa');
+const tokenMesa = paramsUrl.get('t') || '';
 if (mesaDaUrl) {
   mesaInput.value = mesaDaUrl;
   mesaInput.readOnly = true;
@@ -302,6 +332,7 @@ async function fazerPedido() {
   try {
     const { error } = await supabase.rpc('criar_pedido', {
       p_mesa: Number(mesaValor),
+      p_token: tokenMesa,
       p_itens: itensPayload,
     });
 
@@ -313,7 +344,11 @@ async function fazerPedido() {
     fecharCarrinho();
   } catch (erro) {
     console.error('Erro ao enviar pedido:', erro);
-    mostrarToast('O pedido NÃO foi enviado. Verifique sua conexão e tente de novo.');
+    // erro.message vem da RPC (ver supabase/005_seguranca.sql) e já foi escrito
+    // pra ser seguro de mostrar — nunca revela SE foi mesa errada, token errado
+    // ou mesa desativada, só que "algo não bateu". Cai no texto genérico só se
+    // vier um erro sem mensagem (rede fora do ar, por exemplo).
+    mostrarToast(erro.message || 'O pedido NÃO foi enviado. Verifique sua conexão e tente de novo.');
     // Carrinho é mantido de propósito — o cliente não perde o que já tinha escolhido.
   } finally {
     cartSubmit.disabled = false;
@@ -337,6 +372,9 @@ const fecharContaModal = document.getElementById('fecharContaModal');
 const fecharContaMesaEl = document.getElementById('fecharContaMesa');
 const fecharContaItensEl = document.getElementById('fecharContaItens');
 const fecharContaVazioEl = document.getElementById('fecharContaVazio');
+const fecharContaResumoEl = document.getElementById('fecharContaResumo');
+const fecharContaSubtotalEl = document.getElementById('fecharContaSubtotal');
+const fecharContaTaxaEl = document.getElementById('fecharContaTaxa');
 const fecharContaTotalEl = document.getElementById('fecharContaTotal');
 const fecharContaClose = document.getElementById('fecharContaClose');
 const fecharContaCancelar = document.getElementById('fecharContaCancelar');
@@ -344,12 +382,14 @@ const fecharContaConfirmar = document.getElementById('fecharContaConfirmar');
 
 // Abre o modal na hora (com "consultando...") e preenche assim que a RPC conta_da_mesa
 // responder. Ela já ignora pedidos "finalizado", então uma mesa reaproveitada não
-// arrasta o consumo de um cliente anterior.
+// arrasta o consumo de um cliente anterior. A taxa de serviço (10%) já vem
+// calculada da RPC (ver supabase/006_taxa_servico.sql) — o cardápio só exibe.
 async function abrirModalFecharConta(mesa) {
   fecharContaMesaEl.textContent = mesa;
   fecharContaItensEl.innerHTML = '';
   fecharContaVazioEl.textContent = 'Consultando conta...';
   fecharContaVazioEl.style.display = 'block';
+  fecharContaResumoEl.style.display = 'none';
   fecharContaTotalEl.textContent = formatarPreco(0);
 
   fecharContaOverlay.classList.add('is-open');
@@ -363,8 +403,10 @@ async function abrirModalFecharConta(mesa) {
     if (!conta.itens || conta.itens.length === 0) {
       fecharContaVazioEl.textContent = 'Nenhum pedido registrado para essa mesa.';
       fecharContaVazioEl.style.display = 'block';
+      fecharContaResumoEl.style.display = 'none';
     } else {
       fecharContaVazioEl.style.display = 'none';
+      fecharContaResumoEl.style.display = 'block';
       fecharContaItensEl.innerHTML = conta.itens.map(item => `
         <li class="modal-panel__item">
           <span>${item.quantidade}x ${item.nome}</span>
@@ -373,10 +415,13 @@ async function abrirModalFecharConta(mesa) {
       `).join('');
     }
 
+    fecharContaSubtotalEl.textContent = formatarPreco(conta.subtotal);
+    fecharContaTaxaEl.textContent = formatarPreco(conta.taxa_servico);
     fecharContaTotalEl.textContent = formatarPreco(conta.total);
   } catch (erro) {
     console.error('Erro ao consultar conta da mesa:', erro);
     fecharContaItensEl.innerHTML = '';
+    fecharContaResumoEl.style.display = 'none';
     fecharContaVazioEl.textContent = 'Não foi possível consultar a conta agora. Verifique sua conexão e tente de novo.';
     fecharContaVazioEl.style.display = 'block';
   }
@@ -410,7 +455,7 @@ async function confirmarFecharConta() {
   fecharContaConfirmar.disabled = true;
 
   try {
-    const { error } = await supabase.rpc('pedir_fechamento', { p_mesa: Number(mesa) });
+    const { error } = await supabase.rpc('pedir_fechamento', { p_mesa: Number(mesa), p_token: tokenMesa });
 
     if (error) throw error;
 
@@ -418,7 +463,7 @@ async function confirmarFecharConta() {
     mostrarToast('Pedido de fechamento enviado! O garçom já foi avisado.');
   } catch (erro) {
     console.error('Erro ao pedir fechamento:', erro);
-    mostrarToast('Não foi possível enviar o pedido de fechamento. Verifique sua conexão e tente de novo.');
+    mostrarToast(erro.message || 'Não foi possível enviar o pedido de fechamento. Verifique sua conexão e tente de novo.');
   } finally {
     fecharContaConfirmar.disabled = false;
   }

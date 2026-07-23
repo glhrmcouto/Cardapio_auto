@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Página não encontrada — AOOBA! BAR</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0d0d0d">
+  <link rel="icon" type="image/svg+xml" href="img/aooba_bar_fundo_escuro.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Só usado nesta página — não precisa de um arquivo CSS à parte pra isso */
+    .pagina-404 {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem 1.25rem;
+    }
+
+    .pagina-404__logo {
+      width: min(70vw, 280px);
+      margin-bottom: 2rem;
+      filter: drop-shadow(0 0 30px rgba(255, 122, 26, 0.4));
+    }
+
+    .pagina-404__codigo {
+      font-family: var(--fonte-titulo);
+      font-weight: 800;
+      font-size: clamp(3rem, 12vw, 6rem);
+      color: var(--laranja-forte);
+      line-height: 1;
+    }
+
+    .pagina-404__titulo {
+      font-family: var(--fonte-titulo);
+      font-weight: 700;
+      font-size: clamp(1.2rem, 3vw, 1.6rem);
+      margin: 0.5rem 0 1rem;
+    }
+
+    .pagina-404__texto {
+      max-width: 420px;
+      color: var(--cinza-claro);
+      line-height: 1.7;
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="pagina-404">
+    <img src="img/aooba_bar_fundo_escuro.svg" alt="AOOBA! BAR" class="pagina-404__logo">
+    <span class="pagina-404__codigo">404</span>
+    <h1 class="pagina-404__titulo">Essa página fugiu pro narguilé</h1>
+    <p class="pagina-404__texto">
+      O link que você seguiu não existe ou mudou de endereço. Se você escaneou um QR code de
+      mesa, confere com o garçom se o adesivo ainda é o certo — ou volta pro cardápio abaixo.
+    </p>
+    <a href="/" class="btn btn--primary">Voltar pro cardápio</a>
+  </div>
+
+</body>
+</html>

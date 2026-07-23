@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AOOBA! — Relatórios</title>
+  <meta name="description" content="Relatórios de vendas do AOOBA! BAR — faturamento, produtos mais vendidos e movimento por horário.">
+  <meta name="theme-color" content="#0d0d0d">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/svg+xml" href="img/aooba_bar_fundo_escuro.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="admin.css">
+  <link rel="stylesheet" href="relatorios.css">
+</head>
+<body>
+
+  <!-- ===== LOGIN (nada aparece sem sessão autenticada E com papel admin) ===== -->
+  <div class="login-tela" id="loginTela">
+    <form class="login-card" id="loginForm" novalidate>
+      <h1 class="login-card__titulo">AOOBA! <span>— Relatórios</span></h1>
+      <label for="loginEmail">E-mail</label>
+      <input type="email" id="loginEmail" autocomplete="username" required>
+      <label for="loginSenha">Senha</label>
+      <input type="password" id="loginSenha" autocomplete="current-password" required>
+      <p class="login-card__erro" id="loginErro" role="alert" style="display: none;"></p>
+      <button type="submit" class="btn btn--primary login-card__entrar" id="loginEntrarBtn">Entrar</button>
+    </form>
+  </div>
+
+  <!-- ===== CONTEÚDO (só aparece logado E com papel admin) ===== -->
+  <div id="relatoriosPagina" style="display: none;">
+
+    <header class="header admin-header">
+      <nav class="nav container">
+        <span class="nav__logo">AOOBA! <span class="admin-header__tag">— Relatórios</span></span>
+        <div class="admin-header__acoes">
+          <a class="btn btn--secondary admin-header__sair" href="admin.html">Cardápio</a>
+          <button class="btn btn--secondary admin-header__sair" id="sairBtn">Sair</button>
+        </div>
+      </nav>
+    </header>
+
+    <main class="admin-main container">
+      <div class="admin-toolbar">
+        <h1 class="admin-titulo">Relatórios</h1>
+        <div class="rel-backup">
+          <button type="button" class="btn btn--secondary" id="backupBtn">Baixar backup completo</button>
+          <p class="rel-backup__dica">produtos, pedidos e itens — .zip com .json + .csv</p>
+        </div>
+      </div>
+
+      <section class="rel-periodo" aria-label="Selecionar período">
+        <div class="rel-periodo__atalhos" role="group" aria-label="Atalhos de período">
+          <button type="button" class="rel-periodo__btn" data-atalho="hoje">Hoje</button>
+          <button type="button" class="rel-periodo__btn" data-atalho="7dias">Últimos 7 dias</button>
+          <button type="button" class="rel-periodo__btn" data-atalho="30dias">Últimos 30 dias</button>
+          <button type="button" class="rel-periodo__btn" data-atalho="mes">Mês atual</button>
+        </div>
+        <form class="rel-periodo__custom" id="periodoCustomForm">
+          <label for="periodoInicio">De</label>
+          <input type="date" id="periodoInicio" required>
+          <label for="periodoFim">Até</label>
+          <input type="date" id="periodoFim" required>
+          <button type="submit" class="btn btn--secondary rel-periodo__aplicar">Aplicar</button>
+        </form>
+      </section>
+
+      <p class="cardapio-status" id="relatorioCarregando">Carregando relatório...</p>
+      <div class="cardapio-status cardapio-status--erro" id="relatorioErro" style="display: none;">
+        <p>Não foi possível carregar o relatório agora. Verifique sua conexão e tente de novo.</p>
+        <button type="button" class="btn btn--secondary" id="relatorioTentar">Tentar novamente</button>
+      </div>
+
+      <div class="rel-vazio" id="relatorioVazio" style="display: none;">
+        <p>Nenhum pedido registrado nesse período.</p>
+        <p class="rel-vazio__dica">Tente escolher um intervalo maior ou conferir se as datas estão corretas.</p>
+      </div>
+
+      <div id="relatorioConteudo" style="display: none;">
+
+        <div class="rel-cards">
+          <div class="rel-card">
+            <span class="rel-card__label">Faturamento total</span>
+            <span class="rel-card__valor" id="cardFaturamento">R$ 0,00</span>
+          </div>
+          <div class="rel-card">
+            <span class="rel-card__label">Pedidos</span>
+            <span class="rel-card__valor" id="cardPedidos">0</span>
+          </div>
+          <div class="rel-card">
+            <span class="rel-card__label">Ticket médio</span>
+            <span class="rel-card__valor" id="cardTicketMedio">R$ 0,00</span>
+          </div>
+          <div class="rel-card">
+            <span class="rel-card__label">Item campeão</span>
+            <span class="rel-card__valor rel-card__valor--texto" id="cardItemCampeao">—</span>
+          </div>
+        </div>
+
+        <div class="rel-graficos">
+          <div class="rel-painel rel-painel--linha">
+            <h2 class="rel-painel__titulo">Faturamento por dia</h2>
+            <div class="rel-painel__canvas"><canvas id="graficoFaturamento"></canvas></div>
+          </div>
+          <div class="rel-painel rel-painel--rosca">
+            <h2 class="rel-painel__titulo">Vendas por categoria</h2>
+            <div class="rel-painel__canvas"><canvas id="graficoCategoria"></canvas></div>
+          </div>
+        </div>
+
+        <div class="rel-painel rel-painel--hora">
+          <h2 class="rel-painel__titulo">Movimento por hora<span class="rel-painel__subtitulo" id="picoHorario"></span></h2>
+          <div class="rel-painel__canvas"><canvas id="graficoHora"></canvas></div>
+        </div>
+
+        <div class="rel-tabelas">
+          <section class="rel-tabela-bloco">
+            <div class="rel-tabela-bloco__topo">
+              <h2 class="rel-painel__titulo">Mais vendidos</h2>
+              <button type="button" class="btn btn--secondary" id="exportarCsvBtn">Exportar CSV</button>
+            </div>
+            <div class="rel-tabela-scroll">
+              <table class="rel-tabela" id="tabelaMaisVendidos">
+                <thead>
+                  <tr>
+                    <th data-ordenar="nome">Produto</th>
+                    <th data-ordenar="quantidade">Qtd.</th>
+                    <th data-ordenar="receita">Receita</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="rel-tabela-bloco">
+            <h2 class="rel-painel__titulo">Ticket médio por mesa</h2>
+            <div class="rel-tabela-scroll">
+              <table class="rel-tabela" id="tabelaTicketMesa">
+                <thead>
+                  <tr>
+                    <th>Mesa</th>
+                    <th>Pedidos</th>
+                    <th>Ticket médio</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script type="module" src="relatorios.js"></script>
+</body>
+</html>

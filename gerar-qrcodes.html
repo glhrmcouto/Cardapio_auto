@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AOOBA! — Gerar QR codes</title>
+  <meta name="description" content="Geração dos QR codes de mesa do AOOBA! BAR, prontos pra imprimir.">
+  <meta name="theme-color" content="#0d0d0d">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/svg+xml" href="img/aooba_bar_fundo_escuro.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="admin.css">
+  <link rel="stylesheet" href="gerar-qrcodes.css">
+</head>
+<body>
+
+  <!-- ===== LOGIN (nada aparece sem sessão autenticada E com papel admin) ===== -->
+  <div class="login-tela" id="loginTela">
+    <form class="login-card" id="loginForm" novalidate>
+      <h1 class="login-card__titulo">AOOBA! <span>— QR codes</span></h1>
+      <label for="loginEmail">E-mail</label>
+      <input type="email" id="loginEmail" autocomplete="username" required>
+      <label for="loginSenha">Senha</label>
+      <input type="password" id="loginSenha" autocomplete="current-password" required>
+      <p class="login-card__erro" id="loginErro" role="alert" style="display: none;"></p>
+      <button type="submit" class="btn btn--primary login-card__entrar" id="loginEntrarBtn">Entrar</button>
+    </form>
+  </div>
+
+  <!-- ===== CONTEÚDO (só aparece logado E com papel admin) ===== -->
+  <div id="qrPagina" style="display: none;">
+
+    <header class="header admin-header">
+      <nav class="nav container">
+        <span class="nav__logo">AOOBA! <span class="admin-header__tag">— Gerar QR codes</span></span>
+        <div class="admin-header__acoes">
+          <a class="btn btn--secondary admin-header__sair" href="admin.html">Cardápio</a>
+          <button class="btn btn--secondary admin-header__sair" id="sairBtn">Sair</button>
+        </div>
+      </nav>
+    </header>
+
+    <main class="admin-main container">
+      <div class="admin-toolbar">
+        <h1 class="admin-titulo">Gerar QR codes das mesas</h1>
+        <div class="qr-acoes">
+          <button type="button" class="btn btn--secondary" id="qrRecarregarBtn">Recarregar</button>
+          <button type="button" class="btn btn--primary" id="qrImprimirBtn">Imprimir</button>
+        </div>
+      </div>
+
+      <p class="qr-instrucoes">
+        Um QR code por mesa <strong>ativa</strong> cadastrada em Mesas (ver <a href="admin.html">administrador</a>),
+        já apontando pro link certo dessa mesa. Se você acabou de adicionar ou reativar uma mesa, clique em
+        "Recarregar".
+      </p>
+
+      <p class="cardapio-status" id="qrCarregando">Carregando mesas...</p>
+      <div class="cardapio-status cardapio-status--erro" id="qrErro" style="display: none;">
+        <p id="qrErroTexto">Não foi possível carregar as mesas agora. Verifique sua conexão e tente de novo.</p>
+        <button type="button" class="btn btn--secondary" id="qrTentar">Tentar novamente</button>
+      </div>
+      <p class="cardapio-status" id="qrVazio" style="display: none;">Nenhuma mesa ativa cadastrada ainda — adicione mesas no admin.html primeiro.</p>
+
+      <div class="qr-grid" id="qrGrid"></div>
+    </main>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+  <script type="module" src="gerar-qrcodes.js"></script>
+</body>
+</html>

@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AOOBA! — Balcão</title>
+  <meta name="description" content="Painel do balcão do AOOBA! BAR — acompanhamento de pedidos em tempo real.">
+  <meta name="theme-color" content="#0d0d0d">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/svg+xml" href="img/aooba_bar_fundo_escuro.svg">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,6 +51,11 @@
 
     <!-- ===== FILA DE PEDIDOS ===== -->
     <main class="balcao-main container">
+      <div class="cardapio-status cardapio-status--erro" id="balcaoErro" style="display: none;">
+        <p>Não foi possível carregar os pedidos agora. Isso NÃO significa que não há pedidos — verifique sua conexão e tente de novo antes de assumir que o salão está vazio.</p>
+        <button type="button" class="btn btn--secondary" id="balcaoTentar">Tentar novamente</button>
+      </div>
+
       <div class="fechamento-grid" id="fechamentoGrid">
         <!-- Cards de fechamento de conta gerados via JS -->
       </div>

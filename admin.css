@@ -1,0 +1,281 @@
+/* ========================================
+   TELA DO ADMIN
+   (reaproveita as variáveis e classes de style.css:
+   .header, .nav, .container, .btn, .cardapio-status etc.)
+======================================== */
+
+.admin-header {
+  top: 0; /* aqui não existe a barra de "número da mesa" do cardápio */
+}
+
+.admin-header__tag {
+  color: var(--branco);
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.admin-header__acoes {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.admin-header__sair {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.85rem;
+}
+
+.admin-main {
+  padding: 7rem 1.25rem 3rem;
+  min-height: 100vh;
+}
+
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+#novoProdutoContainer:not(:empty) {
+  margin-bottom: 2rem;
+}
+
+.admin-titulo {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  color: var(--laranja-forte);
+}
+
+/* ========================================
+   SEÇÕES POR CATEGORIA
+======================================== */
+.admin-categoria {
+  margin-bottom: 2.5rem;
+}
+
+.admin-categoria__titulo {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: clamp(1.1rem, 3vw, 1.4rem);
+  color: var(--salmao);
+  margin-bottom: 1rem;
+}
+
+.admin-categoria__lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+
+/* ========================================
+   CARD DE PRODUTO (editável — nome/descrição/preço/categoria/ordem)
+======================================== */
+.admin-produto-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1.25rem;
+  background: var(--preto-2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  transition: border-color var(--transicao), opacity var(--transicao);
+}
+
+.admin-produto-card--inativo {
+  opacity: 0.6;
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
+.admin-produto-card--novo {
+  border-color: rgba(245, 119, 46, 0.4);
+  box-shadow: 0 8px 24px rgba(245, 119, 46, 0.2);
+}
+
+.admin-produto-card__status--novo {
+  color: var(--laranja-forte);
+  background: rgba(245, 119, 46, 0.15);
+}
+
+.admin-produto-card__topo {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.admin-produto-card__status {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 50px;
+}
+
+.admin-produto-card__status--ativo {
+  color: #6bd97a;
+  background: rgba(107, 217, 122, 0.15);
+}
+
+.admin-produto-card__status--inativo {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.15);
+}
+
+.admin-produto-card__campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.admin-produto-card__campo label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--cinza-claro);
+}
+
+.admin-produto-card__input {
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--preto);
+  color: var(--branco);
+  font-family: var(--fonte-texto);
+  font-size: 0.9rem;
+}
+
+.admin-produto-card__input:focus {
+  outline: none;
+  border-color: var(--laranja);
+}
+
+textarea.admin-produto-card__input {
+  resize: vertical;
+  min-height: 3rem;
+  font-family: var(--fonte-texto);
+  line-height: 1.4;
+}
+
+.admin-produto-card__linha {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.admin-produto-card__ordem-controles {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.admin-produto-card__ordem-input {
+  text-align: center;
+}
+
+.admin-produto-card__seta {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: var(--laranja-forte);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color var(--transicao);
+}
+
+.admin-produto-card__seta:hover {
+  border-color: var(--laranja);
+}
+
+.admin-produto-card__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.2rem;
+}
+
+.admin-produto-card__acoes .btn {
+  flex: 1;
+  min-width: 100px;
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+}
+
+.admin-produto-card__excluir {
+  background: transparent;
+  border: 1.5px solid rgba(255, 107, 107, 0.4);
+  color: #ff6b6b;
+}
+
+.admin-produto-card__excluir:hover {
+  background: rgba(255, 107, 107, 0.12);
+  border-color: #ff6b6b;
+}
+
+.admin-produto-card__feedback {
+  min-height: 1.1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.admin-produto-card__feedback--sucesso {
+  color: #6bd97a;
+}
+
+.admin-produto-card__feedback--erro {
+  color: #ff6b6b;
+}
+
+/* ========================================
+   MESAS (token do QR code — ver supabase/005_seguranca.sql)
+======================================== */
+.admin-toolbar--mesas {
+  margin-top: 3rem;
+}
+
+.admin-mesa-nova {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.admin-mesa-nova input {
+  width: 130px;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--preto-2);
+  color: var(--branco);
+  font-family: var(--fonte-texto);
+  font-size: 0.9rem;
+}
+
+.admin-mesa-nova input:focus {
+  outline: none;
+  border-color: var(--laranja);
+}
+
+.admin-mesas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+
+.admin-mesa-card__numero {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--branco);
+}
+
+.admin-mesa-card__url {
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  cursor: text;
+}

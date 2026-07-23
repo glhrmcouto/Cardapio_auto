@@ -96,6 +96,41 @@ img {
   box-shadow: 0 0 35px rgba(255, 122, 26, 0.7);
 }
 
+/*AVISO DE SEM CONEXÃO*/
+/* Fica acima de tudo (inclusive a barra da mesa), some por padrão fora da
+   tela em vez de "display: none" — assim dá pra medir a altura real dele
+   (offlineAviso.offsetHeight, em script.js) mesmo enquanto está escondido,
+   e empurrar a barra da mesa/header pra baixo na medida certa, sem
+   precisar de um número de pixels chutado no CSS. */
+.offline-aviso {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 260;
+  transform: translateY(-100%);
+  transition: transform var(--transicao);
+  padding: 0.55rem 1.25rem;
+  background: #ff6b6b;
+  color: #2b0505;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.offline-aviso.show {
+  transform: translateY(0);
+}
+
+/* Empurra a barra da mesa e o header pra baixo enquanto o aviso está visível */
+body.is-offline .mesa-bar {
+  top: var(--offline-altura, 40px);
+}
+
+body.is-offline .header {
+  top: calc(48px + var(--offline-altura, 40px));
+}
+
 /*BARRA FIXA: NÚMERO DA MESA*/
 .mesa-bar {
   position: fixed;
@@ -111,6 +146,7 @@ img {
   padding: 0.6rem 1.25rem;
   background: var(--preto-2);
   border-bottom: 2px solid var(--laranja);
+  transition: top var(--transicao);
 }
 
 .mesa-bar label {
@@ -168,7 +204,7 @@ img {
   background: rgba(13, 13, 13, 0.75);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(245, 119, 46, 0.15);
-  transition: background var(--transicao);
+  transition: background var(--transicao), top var(--transicao);
 }
 
 .nav {
@@ -933,6 +969,14 @@ img {
   text-decoration: underline;
 }
 
+.modal-panel__linha {
+  display: flex;
+  justify-content: space-between;
+  color: var(--cinza-claro);
+  font-size: 0.88rem;
+  padding: 0.2rem 0;
+}
+
 .modal-panel__total {
   display: flex;
   justify-content: space-between;
@@ -969,4 +1013,77 @@ img {
 .btn--secondary:hover {
   border-color: var(--laranja);
   color: var(--laranja-forte);
+}
+
+/* ========================================
+   LOGIN (telas que exigem sessão: balcao.html e admin.html)
+======================================== */
+.login-tela {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: var(--preto);
+}
+
+.login-card {
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 2rem 1.75rem;
+  background: var(--preto-2);
+  border: 1px solid rgba(245, 119, 46, 0.25);
+  border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.login-card__titulo {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  font-size: 1.5rem;
+  color: var(--laranja-forte);
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.login-card__titulo span {
+  color: var(--branco);
+}
+
+.login-card label {
+  font-size: 0.85rem;
+  color: var(--cinza-claro);
+  margin-bottom: -0.4rem;
+}
+
+.login-card input {
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--preto);
+  color: var(--branco);
+  font-family: var(--fonte-texto);
+  font-size: 0.95rem;
+}
+
+.login-card input:focus {
+  outline: none;
+  border-color: var(--laranja);
+}
+
+.login-card__erro {
+  color: #ff6b6b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.login-card__entrar {
+  margin-top: 0.4rem;
+  width: 100%;
+  text-align: center;
 }

@@ -3,7 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AOOBA! BAR</title>
+  <title>AOOBA! BAR — Cardápio Digital</title>
+  <meta name="description" content="Peça direto pelo celular: drinks autorais, cervejas geladas e narguile de respeito no AOOBA! BAR. Escaneie o QR code da sua mesa e monte seu pedido sem sair do lugar.">
+  <meta name="theme-color" content="#0d0d0d">
+  <link rel="icon" type="image/svg+xml" href="img/aooba_bar_fundo_escuro.svg">
+  <link rel="canonical" href="https://SEU-DOMINIO-AQUI/">
+
+  <!-- Open Graph / WhatsApp / Instagram / Facebook — como o link fica ao ser
+       compartilhado. Troque "https://SEU-DOMINIO-AQUI" pelo domínio real
+       assim que o site for publicado (crawlers de rede social não resolvem
+       URL relativa em og:image/og:url, precisa ser absoluta). -->
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="pt_BR">
+  <meta property="og:site_name" content="AOOBA! BAR">
+  <meta property="og:title" content="AOOBA! BAR — Cardápio Digital">
+  <meta property="og:description" content="Peça direto pelo celular: drinks autorais, cervejas geladas e narguile de respeito no AOOBA! BAR.">
+  <meta property="og:image" content="https://SEU-DOMINIO-AQUI/img/Caipirinha.jpg">
+  <meta property="og:image:width" content="1024">
+  <meta property="og:image:height" content="1024">
+  <meta property="og:url" content="https://SEU-DOMINIO-AQUI/">
+  <meta name="twitter:card" content="summary_large_image">
 
   <!-- Fontes: Baloo 2 para títulos (estilo bold/arredondado), Poppins para textos -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,6 +32,9 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+  <!-- ===== AVISO DE SEM CONEXÃO (só aparece quando o navegador detecta que caiu a internet) ===== -->
+  <div class="offline-aviso" id="offlineAviso" role="alert">Sem internet — seu pedido não será enviado.</div>
 
   <!-- ===== BARRA FIXA: NÚMERO DA MESA ===== -->
   <div class="mesa-bar" id="mesaBar">
@@ -169,6 +191,16 @@
     </div>
     <p class="modal-panel__vazio" id="fecharContaVazio">Nenhum pedido registrado para essa mesa.</p>
     <ul class="modal-panel__itens" id="fecharContaItens"></ul>
+    <div class="modal-panel__resumo" id="fecharContaResumo" style="display: none;">
+      <div class="modal-panel__linha">
+        <span>Subtotal</span>
+        <span id="fecharContaSubtotal">R$ 0,00</span>
+      </div>
+      <div class="modal-panel__linha">
+        <span>Taxa de serviço (10%)</span>
+        <span id="fecharContaTaxa">R$ 0,00</span>
+      </div>
+    </div>
     <div class="modal-panel__total">
       <span>Total</span>
       <span id="fecharContaTotal">R$ 0,00</span>

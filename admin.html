@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AOOBA! — Administrador</title>
+  <meta name="description" content="Painel administrativo do AOOBA! BAR — gerenciamento de cardápio e mesas.">
+  <meta name="theme-color" content="#0d0d0d">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/svg+xml" href="img/aooba_bar_fundo_escuro.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+  <!-- ===== LOGIN (nada aparece sem sessão autenticada E com papel admin) ===== -->
+  <div class="login-tela" id="loginTela">
+    <form class="login-card" id="loginForm" novalidate>
+      <h1 class="login-card__titulo">AOOBA! <span>— Administrador</span></h1>
+      <label for="loginEmail">E-mail</label>
+      <input type="email" id="loginEmail" autocomplete="username" required>
+      <label for="loginSenha">Senha</label>
+      <input type="password" id="loginSenha" autocomplete="current-password" required>
+      <p class="login-card__erro" id="loginErro" role="alert" style="display: none;"></p>
+      <button type="submit" class="btn btn--primary login-card__entrar" id="loginEntrarBtn">Entrar</button>
+    </form>
+  </div>
+
+  <!-- ===== CONTEÚDO DO ADMIN (só aparece logado E com papel admin) ===== -->
+  <div id="adminConteudo" style="display: none;">
+
+    <header class="header admin-header">
+      <nav class="nav container">
+        <span class="nav__logo">AOOBA! <span class="admin-header__tag">— Administrador</span></span>
+        <div class="admin-header__acoes">
+          <a class="btn btn--secondary admin-header__sair" href="relatorios.html">Relatórios</a>
+          <a class="btn btn--secondary admin-header__sair" href="gerar-qrcodes.html">QR codes</a>
+          <button class="btn btn--secondary admin-header__sair" id="sairBtn">Sair</button>
+        </div>
+      </nav>
+    </header>
+
+    <main class="admin-main container">
+      <div class="admin-toolbar">
+        <h1 class="admin-titulo">Cardápio</h1>
+        <button type="button" class="btn btn--primary" id="adicionarProdutoBtn">+ Adicionar produto</button>
+      </div>
+
+      <p class="cardapio-status" id="produtosCarregando">Carregando produtos...</p>
+      <div class="cardapio-status cardapio-status--erro" id="produtosErro" style="display: none;">
+        <p>Não foi possível carregar os produtos agora. Verifique sua conexão e tente de novo.</p>
+        <button type="button" class="btn btn--secondary" id="produtosTentar">Tentar novamente</button>
+      </div>
+
+      <div id="novoProdutoContainer"></div>
+      <div id="categoriasContainer"></div>
+
+      <div class="admin-toolbar admin-toolbar--mesas">
+        <h1 class="admin-titulo">Mesas</h1>
+        <form class="admin-mesa-nova" id="novaMesaForm">
+          <input type="number" id="novaMesaNumero" min="1" placeholder="Nº da mesa" required>
+          <button type="submit" class="btn btn--primary">+ Adicionar mesa</button>
+        </form>
+      </div>
+
+      <p class="cardapio-status" id="mesasCarregando">Carregando mesas...</p>
+      <div class="cardapio-status cardapio-status--erro" id="mesasErro" style="display: none;">
+        <p>Não foi possível carregar as mesas agora. Verifique sua conexão e tente de novo.</p>
+        <button type="button" class="btn btn--secondary" id="mesasTentar">Tentar novamente</button>
+      </div>
+
+      <div class="admin-mesas-grid" id="mesasContainer"></div>
+    </main>
+
+  </div>
+
+  <script type="module" src="admin.js"></script>
+</body>
+</html>
