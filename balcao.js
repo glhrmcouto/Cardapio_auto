@@ -10,7 +10,7 @@
 // aparelho (celular do cliente fazendo pedido enquanto o balcão fica no PC).
 
 import { supabase } from './supabaseClient.js';
-import { formatarPreco, formatarDataISO, calcularTaxaServico } from './shared.js';
+import { formatarPreco, formatarDataISO } from './shared.js';
 
 // ========================================
 // ELEMENTOS
@@ -33,6 +33,7 @@ const balcaoGrid = document.getElementById('balcaoGrid');
 const balcaoVazio = document.getElementById('balcaoVazio');
 const contadorPedidos = document.getElementById('contadorPedidos');
 const fechamentoGrid = document.getElementById('fechamentoGrid');
+const individualGrid = document.getElementById('individualGrid');
 
 const historicoBtn = document.getElementById('historicoBtn');
 const historicoOverlay = document.getElementById('historicoOverlay');
@@ -44,7 +45,8 @@ const historicoFiltroData = document.getElementById('historicoFiltroData');
 const historicoFiltroLimpar = document.getElementById('historicoFiltroLimpar');
 
 let pedidos = []; // só os pedidos com status "pendente" — cada um já vem com .itens embutido
-let fechamentos = []; // pedidos de "fechar conta" ainda não atendidos
+let fechamentos = []; // pedidos de "fechar conta" (mesa inteira) ainda não atendidos
+let fechamentosIndividuais = []; // fechamentos parciais ("fechar só a minha conta") ainda não confirmados
 
 function formatarHorario(iso) {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -128,8 +130,10 @@ supabase.auth.onAuthStateChange((_evento, session) => {
     balcaoIniciado = false;
     pedidos = [];
     fechamentos = [];
+    fechamentosIndividuais = [];
     renderizarPedidos();
     fechamentoGrid.innerHTML = '';
+    individualGrid.innerHTML = '';
     mostrarTelaLogin();
   }
 });
@@ -265,7 +269,7 @@ if (ativarSomBtn) {
 async function carregarPedidosPendentes() {
   const { data, error } = await supabase
     .from('pedidos')
-    .select('id, mesa, total, status, criado_em, itens:pedido_itens(nome:nome_snapshot, preco:preco_unitario, quantidade)')
+    .select('id, mesa, total, status, criado_em, cliente_nome, itens:pedido_itens(nome:nome_snapshot, preco:preco_unitario, quantidade)')
     .eq('tipo', 'pedido')
     .eq('status', 'pendente')
     .order('criado_em', { ascending: true });
@@ -286,21 +290,38 @@ async function carregarFechamentosPendentes() {
   fechamentos = data;
 }
 
+async function carregarFechamentosIndividuaisPendentes() {
+  const { data, error } = await supabase
+    .from('fechamentos_individuais')
+    .select('id, mesa, cliente_nome, subtotal, taxa_servico, total, criado_em')
+    .eq('atendido', false)
+    .order('criado_em', { ascending: true });
+
+  if (error) throw error;
+  fechamentosIndividuais = data;
+}
+
 async function carregarTudoInicial() {
   balcaoErroEl.style.display = 'none';
 
   try {
-    await Promise.all([carregarPedidosPendentes(), carregarFechamentosPendentes()]);
+    await Promise.all([
+      carregarPedidosPendentes(),
+      carregarFechamentosPendentes(),
+      carregarFechamentosIndividuaisPendentes(),
+    ]);
   } catch (erro) {
     console.error('Erro ao carregar pedidos/fechamentos:', erro);
     balcaoGrid.innerHTML = '';
     fechamentoGrid.innerHTML = '';
+    individualGrid.innerHTML = '';
     balcaoVazio.style.display = 'none';
     balcaoErroEl.style.display = 'block';
     return;
   }
 
   renderizarPedidos();
+  renderizarFechamentosIndividuais();
   await renderizarFechamentos();
 }
 
@@ -310,39 +331,27 @@ function ordenarPedidos() {
   pedidos.sort((a, b) => new Date(a.criado_em) - new Date(b.criado_em));
 }
 
-// Itens + subtotal + taxa de serviço (10%) + total consolidado de uma mesa,
-// olhando só pedidos 'pendente' ou 'entregue' (nunca 'finalizado' — senão o
-// consumo do cliente anterior apareceria pro próximo). O balcão é
-// "authenticated", então lê a tabela direto (não precisa da RPC
-// conta_da_mesa, que existe só pra liberar o cliente anônimo) — por isso a
-// taxa é calculada aqui também, e não só na RPC (ver
-// supabase/006_taxa_servico.sql e shared.js).
+// Itens + subtotal + taxa de serviço (10%) + total consolidado da SESSÃO ABERTA
+// da mesa, já com o subtotal por pessoa (rateio dos itens compartilhados
+// aplicado no banco). Usa a RPC conta_da_mesa_balcao (ver
+// supabase/008_sessoes.sql) em vez de consultar a tabela direto, porque o
+// rateio por pessoa é lógica de negócio melhor mantida num só lugar (o banco),
+// não duplicada aqui e na RPC do cliente (conta_da_mesa).
 async function obterContaAtivaDaMesa(mesa) {
-  const { data, error } = await supabase
-    .from('pedido_itens')
-    .select('nome:nome_snapshot, preco:preco_unitario, quantidade, pedidos!inner(mesa, tipo, status)')
-    .eq('pedidos.mesa', mesa)
-    .eq('pedidos.tipo', 'pedido')
-    .in('pedidos.status', ['pendente', 'entregue']);
+  const { data, error } = await supabase.rpc('conta_da_mesa_balcao', { p_mesa: Number(mesa) });
 
   if (error) {
     console.error('Erro ao consultar itens da mesa:', error);
-    return { itens: [], subtotal: 0, taxaServico: 0, total: 0 };
+    return { itens: [], subtotal: 0, taxaServico: 0, total: 0, porPessoa: [] };
   }
 
-  const agrupados = {};
-  data.forEach(item => {
-    const chave = `${item.nome}__${item.preco}`;
-    if (!agrupados[chave]) {
-      agrupados[chave] = { nome: item.nome, preco: item.preco, quantidade: 0 };
-    }
-    agrupados[chave].quantidade += item.quantidade;
-  });
-
-  const itens = Object.values(agrupados);
-  const subtotal = itens.reduce((soma, item) => soma + item.preco * item.quantidade, 0);
-  const taxaServico = calcularTaxaServico(subtotal);
-  return { itens, subtotal, taxaServico, total: subtotal + taxaServico };
+  return {
+    itens: data.itens,
+    subtotal: data.subtotal,
+    taxaServico: data.taxa_servico,
+    total: data.total,
+    porPessoa: data.por_pessoa,
+  };
 }
 
 // ========================================
@@ -363,6 +372,7 @@ function renderizarPedidos() {
     <div class="pedido-card" data-id="${pedido.id}">
       <div>
         <div class="pedido-card__mesa">Mesa ${pedido.mesa}</div>
+        ${pedido.cliente_nome ? `<div class="pedido-card__cliente">${pedido.cliente_nome}</div>` : ''}
         <div class="pedido-card__horario">${formatarHorario(pedido.criado_em)}</div>
       </div>
       <ul class="pedido-card__itens">
@@ -438,6 +448,14 @@ async function renderizarFechamentos() {
         <div class="fechamento-card__linha"><span>Subtotal</span><span>${formatarPreco(conta.subtotal)}</span></div>
         <div class="fechamento-card__linha"><span>Taxa de serviço (10%)</span><span>${formatarPreco(conta.taxaServico)}</span></div>
       </div>
+      ${conta.porPessoa.length > 1 ? `
+        <div class="fechamento-card__pessoas">
+          <div class="fechamento-card__pessoas-titulo">Subtotal por pessoa</div>
+          ${conta.porPessoa.map(pessoa => `
+            <div class="fechamento-card__linha"><span>${pessoa.nome}</span><span>${formatarPreco(pessoa.subtotal)}</span></div>
+          `).join('')}
+        </div>
+      ` : ''}
       <div class="fechamento-card__total">Total a cobrar: ${formatarPreco(conta.total)}</div>
       <button class="btn btn--primary fechamento-card__fechar" data-id="${fechamento.id}">Conta Fechada</button>
     </div>
@@ -447,8 +465,10 @@ async function renderizarFechamentos() {
   fechamentoGrid.innerHTML = cards.join('');
 }
 
-// Remove o alerta da tela, marca os pedidos ativos da mesa + o próprio fechamento como
-// "finalizado" no Supabase, e tira da fila em memória os pedidos que ainda estavam pendentes
+// Remove o alerta da tela e chama a RPC encerrar_sessao (ver supabase/008_sessoes.sql),
+// que marca a sessão da mesa como fechada e todos os pedidos dela (consumo +
+// fechar_conta) como finalizado — substitui os dois updates manuais que este
+// arquivo fazia antes.
 async function finalizarFechamento(id) {
   const fechamento = fechamentos.find(f => f.id === id);
   if (!fechamento) return;
@@ -465,21 +485,8 @@ async function finalizarFechamento(id) {
   if (botao) botao.disabled = true;
 
   try {
-    const { error: erroPedidos } = await supabase
-      .from('pedidos')
-      .update({ status: 'finalizado' })
-      .eq('mesa', fechamento.mesa)
-      .eq('tipo', 'pedido')
-      .in('status', ['pendente', 'entregue']);
-
-    if (erroPedidos) throw erroPedidos;
-
-    const { error: erroFechamento } = await supabase
-      .from('pedidos')
-      .update({ status: 'finalizado' })
-      .eq('id', id);
-
-    if (erroFechamento) throw erroFechamento;
+    const { error } = await supabase.rpc('encerrar_sessao', { p_mesa: fechamento.mesa });
+    if (error) throw error;
 
     fechamentos = fechamentos.filter(f => f.id !== id);
     pedidos = pedidos.filter(pedido => String(pedido.mesa) !== String(fechamento.mesa));
@@ -496,6 +503,61 @@ fechamentoGrid.addEventListener('click', (event) => {
   const botao = event.target.closest('.fechamento-card__fechar');
   if (!botao) return;
   finalizarFechamento(botao.dataset.id);
+});
+
+// ========================================
+// FECHAMENTO INDIVIDUAL ("fechar só a minha conta")
+// ========================================
+//
+// Diferente do fechamento da mesa inteira: não mexe em pedidos nem em sessão,
+// só avisa que aquela pessoa já pagou a parte dela. "Recebido" marca
+// atendido = true (update direto, mesmo padrão de marcarComoEntregue) — não
+// precisa de RPC porque não há regra de negócio pra validar, só um flag.
+
+function renderizarFechamentosIndividuais() {
+  individualGrid.innerHTML = fechamentosIndividuais.map(fechamento => `
+    <div class="individual-card" data-id="${fechamento.id}">
+      <div class="individual-card__mesa">Mesa ${fechamento.mesa} — fechamento individual</div>
+      <div class="individual-card__nome">${fechamento.cliente_nome}</div>
+      <div class="individual-card__horario">${formatarHorario(fechamento.criado_em)}</div>
+      <div class="individual-card__linha"><span>Subtotal</span><span>${formatarPreco(fechamento.subtotal)}</span></div>
+      <div class="individual-card__linha"><span>Taxa de serviço (10%)</span><span>${formatarPreco(fechamento.taxa_servico)}</span></div>
+      <div class="individual-card__total">Total a cobrar: ${formatarPreco(fechamento.total)}</div>
+      <button class="btn btn--primary individual-card__ok" data-id="${fechamento.id}">Recebido</button>
+    </div>
+  `).join('');
+}
+
+async function marcarFechamentoIndividualRecebido(id) {
+  const botao = individualGrid.querySelector(`.individual-card__ok[data-id="${id}"]`);
+  if (botao) {
+    botao.disabled = true;
+    botao.textContent = 'Marcando...';
+  }
+
+  const { error } = await supabase
+    .from('fechamentos_individuais')
+    .update({ atendido: true, atendido_em: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) {
+    console.error('Erro ao marcar fechamento individual como recebido:', error);
+    alert('Não foi possível marcar como recebido agora. Verifique sua conexão e tente de novo.');
+    if (botao) {
+      botao.disabled = false;
+      botao.textContent = 'Recebido';
+    }
+    return;
+  }
+
+  fechamentosIndividuais = fechamentosIndividuais.filter(f => f.id !== id);
+  renderizarFechamentosIndividuais();
+}
+
+individualGrid.addEventListener('click', (event) => {
+  const botao = event.target.closest('.individual-card__ok');
+  if (!botao) return;
+  marcarFechamentoIndividualRecebido(botao.dataset.id);
 });
 
 // ========================================
@@ -549,11 +611,32 @@ function lidarComAtualizacao(payload) {
   }
 }
 
+// Um fechamento individual novo (de qualquer aparelho/aba) entra direto na tela;
+// se ele já chegar "atendido" (não deveria, mas por segurança) é ignorado.
+function lidarComInsercaoIndividual(payload) {
+  const novo = payload.new;
+  if (novo.atendido) return;
+  fechamentosIndividuais.push(novo);
+  renderizarFechamentosIndividuais();
+  tocarBeep('fechamento');
+}
+
+// Cobre o caso de outro dispositivo/aba ter marcado "Recebido" antes deste.
+function lidarComAtualizacaoIndividual(payload) {
+  const atualizado = payload.new;
+  if (atualizado.atendido && fechamentosIndividuais.some(f => f.id === atualizado.id)) {
+    fechamentosIndividuais = fechamentosIndividuais.filter(f => f.id !== atualizado.id);
+    renderizarFechamentosIndividuais();
+  }
+}
+
 function inscreverRealtime() {
   canalRealtime = supabase
     .channel('balcao-pedidos')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, lidarComInsercao)
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, lidarComAtualizacao)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'fechamentos_individuais' }, lidarComInsercaoIndividual)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'fechamentos_individuais' }, lidarComAtualizacaoIndividual)
     .subscribe((status) => {
       estadoCanal = status;
       recalcularIndicadorConexao();

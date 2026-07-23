@@ -38,6 +38,23 @@
     <label for="mesaInput">Número da mesa:</label>
     <input type="number" id="mesaInput" min="1" placeholder="Ex: 5" required>
     <span class="mesa-bar__aviso" id="mesaAviso">Preencha o número da mesa antes de pedir!</span>
+    <button type="button" class="mesa-bar__nome" id="trocarNomeBtn">👤 <span id="nomeAtualLabel">Identificar-se</span></button>
+  </div>
+
+  <!-- ===== MODAL: IDENTIFICAÇÃO DA PESSOA (nome/apelido, sem login) ===== -->
+  <div class="modal-overlay" id="nomeOverlay"></div>
+  <div class="modal-panel modal-panel--nome" id="nomeModal" role="dialog" aria-modal="true" aria-labelledby="nomeTitulo">
+    <div class="modal-panel__header">
+      <span class="modal-panel__title" id="nomeTitulo">Como podemos te chamar?</span>
+    </div>
+    <p class="nome-modal__texto">Um nome ou apelido curto ajuda a gente a saber de quem é cada pedido na mesa.</p>
+    <label for="nomeInput" class="nome-modal__label">Seu nome ou apelido</label>
+    <input type="text" id="nomeInput" class="nome-modal__input" maxlength="20" placeholder="Ex: João" autocomplete="off">
+    <span class="nome-modal__aviso" id="nomeAviso">Digite um nome pra continuar.</span>
+    <div class="modal-panel__acoes">
+      <button type="button" class="btn btn--secondary" id="nomeCancelar" style="display: none;">Cancelar</button>
+      <button type="button" class="btn btn--primary" id="nomeConfirmar">Confirmar</button>
+    </div>
   </div>
 
   <!-- ===== HEADER FIXO ===== -->
@@ -205,6 +222,13 @@
     <div class="modal-panel__acoes">
       <button class="btn btn--secondary" id="fecharContaCancelar">Cancelar</button>
       <button class="btn btn--primary" id="fecharContaConfirmar">Confirmar Fechamento</button>
+    </div>
+
+    <!-- Fechamento parcial: pra quem sai antes do resto da mesa, sem encerrar a sessão dos outros -->
+    <button type="button" class="modal-panel__individual-link" id="fecharIndividualBtn">Fechar só a minha conta</button>
+    <div class="modal-panel__individual-resultado" id="fecharIndividualResultado" style="display: none;">
+      <p>Sua parte (<span id="fecharIndividualNome"></span>): <strong id="fecharIndividualTotal"></strong></p>
+      <p class="modal-panel__individual-aviso">Mostre esta tela pro garçom confirmar o recebimento.</p>
     </div>
   </div>
 

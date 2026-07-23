@@ -112,6 +112,12 @@
   color: var(--laranja-forte);
 }
 
+.pedido-card__cliente {
+  color: var(--salmao);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .pedido-card__horario {
   color: var(--cinza-claro);
   font-size: 0.85rem;
@@ -227,6 +233,88 @@
   align-self: flex-end;
   font-size: 0.95rem;
   padding: 0.6rem 1.6rem;
+}
+
+/* Subtotal por pessoa (item 4), dentro do card de fechamento da mesa inteira */
+.fechamento-card__pessoas {
+  padding-top: 0.3rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.fechamento-card__pessoas-titulo {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--cinza-claro);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 0.2rem;
+}
+
+/* ========================================
+   FECHAMENTO INDIVIDUAL ("fechar só a minha conta")
+   Alerta mais discreto que o de fechar a mesa inteira (laranja em vez de
+   vermelho): é um aviso de pagamento parcial, não trava o consumo da mesa.
+======================================== */
+.individual-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.individual-grid:empty {
+  display: none;
+  margin-bottom: 0;
+}
+
+.individual-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.2rem 1.4rem;
+  background: rgba(245, 119, 46, 0.08);
+  border: 1px solid rgba(245, 119, 46, 0.35);
+  border-left: 5px solid var(--laranja);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  animation: pedido-entra 0.4s ease;
+}
+
+.individual-card__mesa {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--laranja-forte);
+}
+
+.individual-card__nome {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.individual-card__horario {
+  color: var(--cinza-claro);
+  font-size: 0.8rem;
+}
+
+.individual-card__linha {
+  display: flex;
+  justify-content: space-between;
+  color: var(--cinza-claro);
+  font-size: 0.85rem;
+}
+
+.individual-card__total {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--laranja);
+}
+
+.individual-card__ok {
+  align-self: flex-end;
+  font-size: 0.9rem;
+  padding: 0.55rem 1.4rem;
 }
 
 /*MODAL: HISTÓRICO DE PEDIDOS*/

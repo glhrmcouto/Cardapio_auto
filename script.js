@@ -82,6 +82,28 @@ function renderizarCardsEssencia(lista, containerId) {
   `).join('');
 }
 
+// Cria o HTML de um card de narguilé: igual ao card de bebida, mas com o
+// checkbox "Dividir entre a mesa" (só essa categoria tem item compartilhável —
+// ver supabase/008_sessoes.sql). O estado do checkbox é lido na hora do clique
+// em "Adicionar" (ver delegação de eventos mais abaixo), não fica guardado aqui.
+function renderizarCardsNarguile(lista, containerId) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = lista.map(item => `
+    <div class="card fade-in">
+      <div class="card__header">
+        <span class="card__name">${item.nome}</span>
+        <span class="card__price">${formatarPreco(item.preco)}</span>
+      </div>
+      <p class="card__desc">${item.descricao}</p>
+      <label class="card__compartilhado">
+        <input type="checkbox" class="card__compartilhado-check">
+        Dividir entre a mesa
+      </label>
+      <button class="btn btn--add" data-produto-id="${item.id}" data-nome="${item.nome}" data-preco="${item.preco}">Adicionar</button>
+    </div>
+  `).join('');
+}
+
 function agruparPorCategoria(produtos) {
   const grupos = { drink: [], cerveja: [], sem_alcool: [], narguile: [], essencia: [] };
   produtos.forEach(produto => {
@@ -94,7 +116,11 @@ function renderizarTodoCardapio(produtos) {
   const grupos = agruparPorCategoria(produtos);
 
   Object.entries(GRID_POR_CATEGORIA).forEach(([categoria, gridId]) => {
-    renderizarCardsBebida(grupos[categoria], gridId);
+    if (categoria === 'narguile') {
+      renderizarCardsNarguile(grupos[categoria], gridId);
+    } else {
+      renderizarCardsBebida(grupos[categoria], gridId);
+    }
   });
   renderizarCardsEssencia(grupos.essencia, 'essencias-grid');
 
@@ -189,6 +215,87 @@ if (mesaDaUrl) {
   mesaInput.readOnly = true;
 }
 
+// ========================================
+// IDENTIFICAÇÃO DA PESSOA (nome/apelido, sem login/cadastro)
+// ========================================
+//
+// clienteId é gerado uma vez por navegador/aba (sessionStorage, não localStorage,
+// de propósito: cada visita nova — outro dia, outra pessoa no mesmo aparelho — deve
+// se identificar de novo) e reaproveitado em todos os pedidos feitos nesta visita.
+// É o que permite ao balcão saber "quais pedidos são da mesma pessoa" dentro da
+// sessão da mesa, pro rateio de item compartilhado (ver supabase/008_sessoes.sql).
+
+const CLIENTE_ID_KEY = 'aooba_cliente_id';
+const CLIENTE_NOME_KEY = 'aooba_cliente_nome';
+
+function obterOuCriarClienteId() {
+  let id = sessionStorage.getItem(CLIENTE_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    sessionStorage.setItem(CLIENTE_ID_KEY, id);
+  }
+  return id;
+}
+
+const clienteId = obterOuCriarClienteId();
+let clienteNome = sessionStorage.getItem(CLIENTE_NOME_KEY) || '';
+
+const nomeOverlay = document.getElementById('nomeOverlay');
+const nomeModal = document.getElementById('nomeModal');
+const nomeInput = document.getElementById('nomeInput');
+const nomeAviso = document.getElementById('nomeAviso');
+const nomeConfirmar = document.getElementById('nomeConfirmar');
+const nomeCancelar = document.getElementById('nomeCancelar');
+const trocarNomeBtn = document.getElementById('trocarNomeBtn');
+const nomeAtualLabel = document.getElementById('nomeAtualLabel');
+
+function atualizarLabelNome() {
+  nomeAtualLabel.textContent = clienteNome || 'Identificar-se';
+}
+
+// Sem nome ainda (primeira vez nesta visita): modal é obrigatório, sem botão de
+// cancelar/fechar — a pessoa precisa preencher pra continuar. Já tendo um nome
+// salvo (reabrindo só pra trocar), o cancelar aparece e descarta a edição.
+function abrirModalNome() {
+  nomeInput.value = clienteNome;
+  nomeAviso.classList.remove('show');
+  nomeCancelar.style.display = clienteNome ? '' : 'none';
+  nomeOverlay.classList.add('is-open');
+  nomeModal.classList.add('is-open');
+  setTimeout(() => nomeInput.focus(), 50);
+}
+
+function fecharModalNome() {
+  nomeOverlay.classList.remove('is-open');
+  nomeModal.classList.remove('is-open');
+}
+
+function confirmarNome() {
+  const valor = nomeInput.value.trim();
+  if (!valor) {
+    nomeAviso.classList.add('show');
+    nomeInput.focus();
+    return;
+  }
+  clienteNome = valor.slice(0, 20);
+  sessionStorage.setItem(CLIENTE_NOME_KEY, clienteNome);
+  atualizarLabelNome();
+  fecharModalNome();
+}
+
+nomeConfirmar.addEventListener('click', confirmarNome);
+nomeCancelar.addEventListener('click', fecharModalNome);
+nomeInput.addEventListener('input', () => {
+  if (nomeInput.value.trim()) nomeAviso.classList.remove('show');
+});
+nomeInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') confirmarNome();
+});
+trocarNomeBtn.addEventListener('click', abrirModalNome);
+
+atualizarLabelNome();
+if (!clienteNome) abrirModalNome();
+
 const cartFab = document.getElementById('cartFab');
 const cartBadge = document.getElementById('cartBadge');
 const cartPanel = document.getElementById('cartPanel');
@@ -215,31 +322,33 @@ cartFab.addEventListener('click', abrirCarrinho);
 cartClose.addEventListener('click', fecharCarrinho);
 cartOverlay.addEventListener('click', fecharCarrinho);
 
-// Adiciona um item ao carrinho, ou soma +1 na quantidade se ele já estiver lá
-function adicionarAoCarrinho(produtoId, nome, preco) {
-  const existente = carrinho.find(item => item.produtoId === produtoId);
+// Adiciona um item ao carrinho, ou soma +1 na quantidade se ele já estiver lá com o
+// MESMO estado de "compartilhado" — um narguilé normal e um narguilé "pra dividir"
+// contam como linhas separadas no carrinho, já que vão gerar rateios diferentes.
+function adicionarAoCarrinho(produtoId, nome, preco, compartilhado = false) {
+  const existente = carrinho.find(item => item.produtoId === produtoId && item.compartilhado === compartilhado);
   if (existente) {
     existente.quantidade++;
   } else {
-    carrinho.push({ produtoId, nome, preco, quantidade: 1 });
+    carrinho.push({ produtoId, nome, preco, quantidade: 1, compartilhado });
   }
   renderizarCarrinho();
   abrirCarrinho();
 }
 
 // Soma/subtrai quantidade de um item; remove do carrinho se chegar a 0
-function alterarQuantidade(produtoId, delta) {
-  const item = carrinho.find(i => i.produtoId === produtoId);
+function alterarQuantidade(produtoId, compartilhado, delta) {
+  const item = carrinho.find(i => i.produtoId === produtoId && i.compartilhado === compartilhado);
   if (!item) return;
   item.quantidade += delta;
   if (item.quantidade <= 0) {
-    carrinho = carrinho.filter(i => i.produtoId !== produtoId);
+    carrinho = carrinho.filter(i => !(i.produtoId === produtoId && i.compartilhado === compartilhado));
   }
   renderizarCarrinho();
 }
 
-function removerDoCarrinho(produtoId) {
-  carrinho = carrinho.filter(i => i.produtoId !== produtoId);
+function removerDoCarrinho(produtoId, compartilhado) {
+  carrinho = carrinho.filter(i => !(i.produtoId === produtoId && i.compartilhado === compartilhado));
   renderizarCarrinho();
 }
 
@@ -260,14 +369,14 @@ function renderizarCarrinho() {
     cartItemsEl.innerHTML = carrinho.map(item => `
       <div class="cart-item">
         <div class="cart-item__info">
-          <span class="cart-item__nome">${item.nome}</span>
+          <span class="cart-item__nome">${item.nome}${item.compartilhado ? '<span class="cart-item__tag">Dividido</span>' : ''}</span>
           <span class="cart-item__preco">${formatarPreco(item.preco)}</span>
         </div>
         <div class="cart-item__controles">
-          <button class="cart-item__btn" data-acao="menos" data-produto-id="${item.produtoId}" aria-label="Diminuir quantidade">-</button>
+          <button class="cart-item__btn" data-acao="menos" data-produto-id="${item.produtoId}" data-compartilhado="${item.compartilhado}" aria-label="Diminuir quantidade">-</button>
           <span class="cart-item__qtd">${item.quantidade}</span>
-          <button class="cart-item__btn" data-acao="mais" data-produto-id="${item.produtoId}" aria-label="Aumentar quantidade">+</button>
-          <button class="cart-item__remover" data-acao="remover" data-produto-id="${item.produtoId}" aria-label="Remover item">🗑</button>
+          <button class="cart-item__btn" data-acao="mais" data-produto-id="${item.produtoId}" data-compartilhado="${item.compartilhado}" aria-label="Aumentar quantidade">+</button>
+          <button class="cart-item__remover" data-acao="remover" data-produto-id="${item.produtoId}" data-compartilhado="${item.compartilhado}" aria-label="Remover item">🗑</button>
         </div>
       </div>
     `).join('');
@@ -281,17 +390,22 @@ cartItemsEl.addEventListener('click', (event) => {
   const botao = event.target.closest('button[data-acao]');
   if (!botao) return;
   const produtoId = Number(botao.dataset.produtoId);
+  const compartilhado = botao.dataset.compartilhado === 'true';
   const { acao } = botao.dataset;
-  if (acao === 'mais') alterarQuantidade(produtoId, 1);
-  if (acao === 'menos') alterarQuantidade(produtoId, -1);
-  if (acao === 'remover') removerDoCarrinho(produtoId);
+  if (acao === 'mais') alterarQuantidade(produtoId, compartilhado, 1);
+  if (acao === 'menos') alterarQuantidade(produtoId, compartilhado, -1);
+  if (acao === 'remover') removerDoCarrinho(produtoId, compartilhado);
 });
 
-// Delegação de eventos: cobre os botões "Adicionar" de todos os cards (já existentes e futuros)
+// Delegação de eventos: cobre os botões "Adicionar" de todos os cards (já existentes e futuros).
+// O checkbox "Dividir entre a mesa" (só existe nos cards de narguilé) é lido aqui, na hora
+// do clique — se o card não tiver o checkbox (bebida comum), compartilhado fica false.
 document.addEventListener('click', (event) => {
   const botao = event.target.closest('.btn--add');
   if (!botao) return;
-  adicionarAoCarrinho(Number(botao.dataset.produtoId), botao.dataset.nome, parseFloat(botao.dataset.preco));
+  const checkbox = botao.closest('.card')?.querySelector('.card__compartilhado-check');
+  const compartilhado = checkbox ? checkbox.checked : false;
+  adicionarAoCarrinho(Number(botao.dataset.produtoId), botao.dataset.nome, parseFloat(botao.dataset.preco), compartilhado);
 });
 
 // Mostra uma mensagem rápida no rodapé da tela
@@ -321,9 +435,19 @@ async function fazerPedido() {
     return;
   }
 
+  // Nome é obrigatório pro pedido (ver supabase/008_sessoes.sql) — se por algum
+  // motivo a pessoa chegou até aqui sem ter preenchido (ex.: fechou o modal no
+  // dev tools), reabre o modal em vez de deixar a RPC recusar sem explicação.
+  if (!clienteNome) {
+    abrirModalNome();
+    mostrarToast('Informe seu nome antes de fazer o pedido.');
+    return;
+  }
+
   const itensPayload = carrinho.map(item => ({
     produto_id: item.produtoId,
     quantidade: item.quantidade,
+    compartilhado: item.compartilhado,
   }));
 
   cartSubmit.disabled = true;
@@ -334,6 +458,8 @@ async function fazerPedido() {
       p_mesa: Number(mesaValor),
       p_token: tokenMesa,
       p_itens: itensPayload,
+      p_cliente_nome: clienteNome,
+      p_cliente_id: clienteId,
     });
 
     if (error) throw error;
@@ -379,6 +505,11 @@ const fecharContaTotalEl = document.getElementById('fecharContaTotal');
 const fecharContaClose = document.getElementById('fecharContaClose');
 const fecharContaCancelar = document.getElementById('fecharContaCancelar');
 const fecharContaConfirmar = document.getElementById('fecharContaConfirmar');
+const fecharIndividualBtn = document.getElementById('fecharIndividualBtn');
+const fecharIndividualResultado = document.getElementById('fecharIndividualResultado');
+const fecharIndividualNomeEl = document.getElementById('fecharIndividualNome');
+const fecharIndividualTotalEl = document.getElementById('fecharIndividualTotal');
+const fecharIndividualTextoOriginal = fecharIndividualBtn.textContent;
 
 // Abre o modal na hora (com "consultando...") e preenche assim que a RPC conta_da_mesa
 // responder. Ela já ignora pedidos "finalizado", então uma mesa reaproveitada não
@@ -391,6 +522,13 @@ async function abrirModalFecharConta(mesa) {
   fecharContaVazioEl.style.display = 'block';
   fecharContaResumoEl.style.display = 'none';
   fecharContaTotalEl.textContent = formatarPreco(0);
+
+  // Reseta o bloco de fechamento individual toda vez que o modal abre de novo
+  // (senão o resultado de uma consulta anterior ficaria visível por engano).
+  fecharIndividualResultado.style.display = 'none';
+  fecharIndividualBtn.style.display = '';
+  fecharIndividualBtn.disabled = false;
+  fecharIndividualBtn.textContent = fecharIndividualTextoOriginal;
 
   fecharContaOverlay.classList.add('is-open');
   fecharContaModal.classList.add('is-open');
@@ -476,5 +614,43 @@ fecharContaClose.addEventListener('click', fecharModalFecharConta);
 fecharContaCancelar.addEventListener('click', fecharModalFecharConta);
 fecharContaOverlay.addEventListener('click', fecharModalFecharConta);
 fecharContaConfirmar.addEventListener('click', confirmarFecharConta);
+
+// ========================================
+// FECHAMENTO INDIVIDUAL ("fechar só a minha conta")
+// ========================================
+//
+// Calcula o quanto ESSA pessoa deve (itens dela + rateio dos itens compartilhados
+// da sessão) e grava um aviso pro balcão (fechamentos_individuais, ver
+// supabase/008_sessoes.sql) — NÃO encerra a sessão da mesa, quem ficar continua
+// pedindo normalmente. O resultado fica na tela pra pessoa mostrar pro garçom.
+async function fecharContaIndividual() {
+  const mesa = mesaInput.value.trim();
+  if (!mesa) return;
+
+  fecharIndividualBtn.disabled = true;
+  fecharIndividualBtn.textContent = 'Calculando...';
+
+  try {
+    const { data, error } = await supabase.rpc('fechar_conta_individual', {
+      p_mesa: Number(mesa),
+      p_token: tokenMesa,
+      p_cliente_id: clienteId,
+    });
+
+    if (error) throw error;
+
+    fecharIndividualNomeEl.textContent = data.cliente_nome;
+    fecharIndividualTotalEl.textContent = formatarPreco(data.total);
+    fecharIndividualResultado.style.display = 'block';
+    fecharIndividualBtn.style.display = 'none';
+  } catch (erro) {
+    console.error('Erro ao fechar conta individual:', erro);
+    mostrarToast(erro.message || 'Não foi possível calcular sua conta agora. Verifique sua conexão e tente de novo.');
+    fecharIndividualBtn.disabled = false;
+    fecharIndividualBtn.textContent = fecharIndividualTextoOriginal;
+  }
+}
+
+fecharIndividualBtn.addEventListener('click', fecharContaIndividual);
 
 renderizarCarrinho();

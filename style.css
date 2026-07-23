@@ -194,6 +194,28 @@ body.is-offline .header {
   display: block;
 }
 
+/* Botão discreto pra ver/trocar o nome informado no modal de identificação */
+.mesa-bar__nome {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  padding: 0.3rem 0.7rem;
+  border-radius: 50px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: var(--cinza-claro);
+  font-family: var(--fonte-texto);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color var(--transicao), color var(--transicao);
+}
+
+.mesa-bar__nome:hover {
+  border-color: var(--laranja);
+  color: var(--laranja-forte);
+}
+
 /*HEADER / NAV*/
 .header {
   position: fixed;
@@ -417,6 +439,24 @@ body.is-offline .header {
 }
 
 /* Botão "Adicionar" usado nos cards de drinks, cervejas, narguile e essências */
+/* Checkbox "dividir entre a mesa", só nos cards de narguilé */
+.card__compartilhado {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.7rem 0;
+  font-size: 0.85rem;
+  color: var(--cinza-claro);
+  cursor: pointer;
+}
+
+.card__compartilhado-check {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--laranja);
+  cursor: pointer;
+}
+
 .btn--add {
   display: block;
   width: 100%;
@@ -718,6 +758,18 @@ body.is-offline .header {
   color: var(--laranja);
 }
 
+/* Marca um item do carrinho como "dividir entre a mesa" */
+.cart-item__tag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 50px;
+  background: rgba(245, 119, 46, 0.2);
+  color: var(--laranja-forte);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
 .cart-item__controles {
   display: flex;
   align-items: center;
@@ -1002,6 +1054,86 @@ body.is-offline .header {
   flex: 1;
   padding: 0.75rem 1rem;
   font-size: 0.95rem;
+}
+
+/*MODAL: IDENTIFICAÇÃO DA PESSOA (nome/apelido)*/
+.modal-panel--nome {
+  width: min(360px, 90vw);
+}
+
+.nome-modal__texto {
+  color: var(--cinza-claro);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.nome-modal__label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--salmao);
+  margin-bottom: 0.4rem;
+}
+
+.nome-modal__input {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--preto);
+  color: var(--branco);
+  font-family: var(--fonte-texto);
+  font-size: 1rem;
+}
+
+.nome-modal__input:focus {
+  outline: none;
+  border-color: var(--laranja);
+}
+
+.nome-modal__aviso {
+  display: none;
+  color: #ff6b6b;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: 0.4rem;
+}
+
+.nome-modal__aviso.show {
+  display: block;
+}
+
+/*FECHAMENTO INDIVIDUAL (link dentro do modal de fechar conta)*/
+.modal-panel__individual-link {
+  display: block;
+  width: 100%;
+  margin-top: 1rem;
+  background: none;
+  border: none;
+  color: var(--laranja-forte);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-align: center;
+  cursor: pointer;
+}
+
+.modal-panel__individual-resultado {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: rgba(245, 119, 46, 0.1);
+  border: 1px solid rgba(245, 119, 46, 0.3);
+  text-align: center;
+}
+
+.modal-panel__individual-resultado strong {
+  color: var(--laranja);
+}
+
+.modal-panel__individual-aviso {
+  color: var(--cinza-claro);
+  font-size: 0.8rem;
+  margin-top: 0.4rem;
 }
 
 .btn--secondary {
