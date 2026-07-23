@@ -196,39 +196,80 @@
 
   <button class="fechar-conta-fab" id="fecharContaBtn">Fechar Conta</button>
 
-  <!-- ===== MODAL: CONFIRMAR FECHAMENTO DE CONTA ===== -->
+  <!-- ===== MODAL: CONTA DA MESA (minha parte + conta da mesa inteira) ===== -->
   <div class="modal-overlay" id="fecharContaOverlay"></div>
-  <div class="modal-panel" id="fecharContaModal" role="dialog" aria-modal="true" aria-labelledby="fecharContaTitulo">
+  <div class="modal-panel modal-panel--conta" id="fecharContaModal" role="dialog" aria-modal="true" aria-labelledby="fecharContaTitulo">
     <div class="modal-panel__header">
-      <span class="modal-panel__title" id="fecharContaTitulo">Fechar conta — Mesa <span id="fecharContaMesa"></span></span>
+      <span class="modal-panel__title" id="fecharContaTitulo">Conta — Mesa <span id="fecharContaMesa"></span></span>
       <button class="modal-panel__close" id="fecharContaClose" aria-label="Fechar">&times;</button>
     </div>
-    <p class="modal-panel__vazio" id="fecharContaVazio">Nenhum pedido registrado para essa mesa.</p>
-    <ul class="modal-panel__itens" id="fecharContaItens"></ul>
-    <div class="modal-panel__resumo" id="fecharContaResumo" style="display: none;">
-      <div class="modal-panel__linha">
-        <span>Subtotal</span>
-        <span id="fecharContaSubtotal">R$ 0,00</span>
-      </div>
-      <div class="modal-panel__linha">
-        <span>Taxa de serviço (10%)</span>
-        <span id="fecharContaTaxa">R$ 0,00</span>
-      </div>
-    </div>
-    <div class="modal-panel__total">
-      <span>Total</span>
-      <span id="fecharContaTotal">R$ 0,00</span>
-    </div>
-    <div class="modal-panel__acoes">
-      <button class="btn btn--secondary" id="fecharContaCancelar">Cancelar</button>
-      <button class="btn btn--primary" id="fecharContaConfirmar">Confirmar Fechamento</button>
+
+    <p class="modal-panel__vazio" id="fecharContaStatus">Consultando conta...</p>
+
+    <div id="fecharContaConteudo" style="display: none;">
+
+      <!-- ===== MINHA PARTE ===== -->
+      <section class="conta-secao">
+        <h3 class="conta-secao__titulo">Minha parte</h3>
+
+        <p class="conta-minha-vazio" id="minhaParteVazio" style="display: none;">Você ainda não pediu nada nessa mesa.</p>
+        <ul class="modal-panel__itens conta-minha-itens" id="minhaParteItens"></ul>
+
+        <div class="conta-minha-acao" id="minhaParteAcaoAberto" style="display: none;">
+          <label class="conta-minha-taxa-toggle">
+            <input type="checkbox" id="minhaParteAceitaTaxa" checked>
+            Incluir <span id="minhaParteTaxaPercentualAberto">10</span>% de serviço
+          </label>
+          <div class="modal-panel__linha"><span>Subtotal</span><span id="minhaParteSubtotalAberto">R$ 0,00</span></div>
+          <div class="modal-panel__linha"><span>Serviço</span><span id="minhaParteTaxaAberto">R$ 0,00</span></div>
+          <div class="modal-panel__total conta-minha-total">
+            <span>Total</span>
+            <span id="minhaParteValorAberto">R$ 0,00</span>
+          </div>
+          <button type="button" class="btn btn--primary conta-minha-fechar" id="fecharMinhaParteBtn">Fechar minha parte</button>
+        </div>
+
+        <div class="conta-minha-aviso" id="minhaParteAguardando" style="display: none;">
+          <p>Sua parte foi enviada ao balcão. Aguarde o garçom.</p>
+          <div class="modal-panel__linha"><span>Subtotal</span><span id="minhaParteSubtotalAguardando">R$ 0,00</span></div>
+          <div class="modal-panel__linha"><span>Serviço</span><span id="minhaParteTaxaAguardando">R$ 0,00</span></div>
+          <div class="modal-panel__linha conta-minha-linha-total"><span>Total</span><strong id="minhaParteValorAguardando">R$ 0,00</strong></div>
+        </div>
+
+        <div class="conta-minha-aviso conta-minha-aviso--pago" id="minhaPartePaga" style="display: none;">
+          <p>Você já pagou sua parte.</p>
+          <div class="modal-panel__linha"><span>Subtotal</span><span id="minhaParteSubtotalPago">R$ 0,00</span></div>
+          <div class="modal-panel__linha"><span>Serviço</span><span id="minhaParteTaxaPago">R$ 0,00</span></div>
+          <div class="modal-panel__linha conta-minha-linha-total"><span>Total</span><strong id="minhaParteValorPago">R$ 0,00</strong></div>
+        </div>
+      </section>
+
+      <!-- ===== CONTA DA MESA (todo mundo) ===== -->
+      <section class="conta-secao">
+        <h3 class="conta-secao__titulo">Conta da mesa</h3>
+
+        <p class="conta-mesa-vazio" id="contaMesaVazio" style="display: none;">Nenhum pedido registrado para essa mesa.</p>
+        <ul class="modal-panel__itens" id="fecharContaItens"></ul>
+
+        <div class="modal-panel__resumo">
+          <div class="modal-panel__linha"><span>Subtotal</span><span id="fecharContaSubtotal">R$ 0,00</span></div>
+          <div class="modal-panel__linha"><span>Serviço (<span id="fecharContaTaxaPercentual">10</span>%)</span><span id="fecharContaTaxa">R$ 0,00</span></div>
+          <div class="modal-panel__linha"><span>Total geral</span><span id="fecharContaTotalGeral">R$ 0,00</span></div>
+          <div class="modal-panel__linha"><span>Já pago / aguardando confirmação</span><span id="fecharContaPago">R$ 0,00</span></div>
+        </div>
+        <div class="modal-panel__total">
+          <span>Saldo restante</span>
+          <span id="fecharContaTotal">R$ 0,00</span>
+        </div>
+
+        <ul class="conta-pessoas" id="contaPessoasLista"></ul>
+      </section>
+
     </div>
 
-    <!-- Fechamento parcial: pra quem sai antes do resto da mesa, sem encerrar a sessão dos outros -->
-    <button type="button" class="modal-panel__individual-link" id="fecharIndividualBtn">Fechar só a minha conta</button>
-    <div class="modal-panel__individual-resultado" id="fecharIndividualResultado" style="display: none;">
-      <p>Sua parte (<span id="fecharIndividualNome"></span>): <strong id="fecharIndividualTotal"></strong></p>
-      <p class="modal-panel__individual-aviso">Mostre esta tela pro garçom confirmar o recebimento.</p>
+    <div class="modal-panel__acoes">
+      <button class="btn btn--secondary" id="fecharContaCancelar">Cancelar</button>
+      <button class="btn btn--primary" id="fecharContaConfirmar">Fechar a conta toda</button>
     </div>
   </div>
 

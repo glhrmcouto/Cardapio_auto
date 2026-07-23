@@ -250,24 +250,66 @@
   margin-bottom: 0.2rem;
 }
 
+.fechamento-card__pessoa-status {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-left: 0.4rem;
+}
+
+.fechamento-card__pessoa-status--em_aberto { color: #ff6b6b; }
+.fechamento-card__pessoa-status--aguardando { color: var(--laranja-forte); }
+.fechamento-card__pessoa-status--pago { color: #6bd97a; }
+
+.fechamento-card__pessoa-detalhe {
+  color: var(--cinza-claro);
+  font-size: 0.72rem;
+  margin-bottom: 0.3rem;
+}
+
+.fechamento-card__saldo-servico {
+  color: var(--cinza-claro);
+  font-size: 0.75rem;
+}
+
+/* Linha "Total | Pago | Falta" — sempre visível no card de fechamento da mesa */
+.fechamento-card__saldo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.82rem;
+  color: var(--cinza-claro);
+}
+
+.fechamento-card__saldo strong {
+  color: var(--branco);
+}
+
+.fechamento-card__saldo .falta strong {
+  color: #ff6b6b;
+}
+
 /* ========================================
-   FECHAMENTO INDIVIDUAL ("fechar só a minha conta")
+   PAGAMENTO PARCIAL PENDENTE ("fechar minha parte")
    Alerta mais discreto que o de fechar a mesa inteira (laranja em vez de
    vermelho): é um aviso de pagamento parcial, não trava o consumo da mesa.
 ======================================== */
-.individual-grid {
+.pagamento-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 1.5rem;
   margin-bottom: 1.5rem;
 }
 
-.individual-grid:empty {
+.pagamento-grid:empty {
   display: none;
   margin-bottom: 0;
 }
 
-.individual-card {
+.pagamento-card {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -280,38 +322,71 @@
   animation: pedido-entra 0.4s ease;
 }
 
-.individual-card__mesa {
+.pagamento-card__titulo {
   font-family: var(--fonte-titulo);
   font-weight: 700;
   font-size: 1.1rem;
   color: var(--laranja-forte);
 }
 
-.individual-card__nome {
-  font-weight: 600;
-  font-size: 1rem;
+.pagamento-card__titulo strong {
+  color: var(--branco);
 }
 
-.individual-card__horario {
+.pagamento-card__horario {
   color: var(--cinza-claro);
   font-size: 0.8rem;
 }
 
-.individual-card__linha {
+.pagamento-card__itens {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--cinza-claro);
+}
+
+.pagamento-card__itens li {
+  display: flex;
+  justify-content: space-between;
+}
+
+.pagamento-card__itens li span:last-child {
+  color: var(--branco);
+}
+
+.pagamento-card__sem-taxa {
+  align-self: flex-start;
+  padding: 0.2rem 0.6rem;
+  border-radius: 50px;
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff6b6b;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.pagamento-card__resumo {
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pagamento-card__linha {
   display: flex;
   justify-content: space-between;
   color: var(--cinza-claro);
   font-size: 0.85rem;
+  padding: 0.1rem 0;
 }
 
-.individual-card__total {
+.pagamento-card__linha--total {
   font-family: var(--fonte-titulo);
   font-weight: 700;
-  font-size: 1.05rem;
   color: var(--laranja);
+  font-size: 0.95rem;
 }
 
-.individual-card__ok {
+.pagamento-card__ok {
   align-self: flex-end;
   font-size: 0.9rem;
   padding: 0.55rem 1.4rem;

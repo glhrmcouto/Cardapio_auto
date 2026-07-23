@@ -60,6 +60,26 @@
       <div id="novoProdutoContainer"></div>
       <div id="categoriasContainer"></div>
 
+      <div class="admin-toolbar">
+        <h1 class="admin-titulo">Configurações</h1>
+      </div>
+
+      <p class="cardapio-status" id="configCarregando">Carregando configurações...</p>
+      <div class="cardapio-status cardapio-status--erro" id="configErro" style="display: none;">
+        <p>Não foi possível carregar as configurações agora. Verifique sua conexão e tente de novo.</p>
+        <button type="button" class="btn btn--secondary" id="configTentar">Tentar novamente</button>
+      </div>
+
+      <form class="admin-config-card" id="configForm" style="display: none;">
+        <div class="admin-produto-card__campo">
+          <label for="taxaServicoInput">Taxa de serviço (%)</label>
+          <input type="number" id="taxaServicoInput" min="0" max="100" step="0.1" required>
+        </div>
+        <p class="admin-config-aviso">Deixe em 0 pra não cobrar taxa de serviço nenhuma.</p>
+        <button type="submit" class="btn btn--primary">Salvar</button>
+        <p class="admin-produto-card__feedback" id="configFeedback" role="status"></p>
+      </form>
+
       <div class="admin-toolbar admin-toolbar--mesas">
         <h1 class="admin-titulo">Mesas</h1>
         <form class="admin-mesa-nova" id="novaMesaForm">

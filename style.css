@@ -1102,39 +1102,156 @@ body.is-offline .header {
   display: block;
 }
 
-/*FECHAMENTO INDIVIDUAL (link dentro do modal de fechar conta)*/
-.modal-panel__individual-link {
-  display: block;
-  width: 100%;
-  margin-top: 1rem;
-  background: none;
-  border: none;
-  color: var(--laranja-forte);
-  font-size: 0.85rem;
+/*MODAL: CONTA DA MESA (seções "Minha parte" e "Conta da mesa")*/
+.modal-panel--conta {
+  width: min(460px, 92vw);
+}
+
+.conta-secao {
+  margin-bottom: 1.3rem;
+  padding-bottom: 1.3rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.conta-secao:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0.3rem;
+  padding-bottom: 0;
+}
+
+.conta-secao__titulo {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--salmao);
+  margin-bottom: 0.7rem;
+}
+
+.conta-minha-vazio,
+.conta-mesa-vazio {
+  color: var(--cinza-claro);
+  font-size: 0.88rem;
+  padding: 0.5rem 0;
+}
+
+/* Marca o item já vinculado a um pagamento (pago ou aguardando confirmação) */
+.conta-item--pago {
+  opacity: 0.55;
+}
+
+.conta-item__tag-pago {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
   font-weight: 600;
-  text-decoration: underline;
-  text-align: center;
+  color: #6bd97a;
+}
+
+.conta-minha-acao {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.conta-minha-taxa-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--cinza-claro);
+  cursor: pointer;
+  margin-bottom: 0.3rem;
+}
+
+.conta-minha-taxa-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--laranja);
   cursor: pointer;
 }
 
-.modal-panel__individual-resultado {
-  margin-top: 1rem;
-  padding: 1rem;
-  border-radius: 12px;
-  background: rgba(245, 119, 46, 0.1);
-  border: 1px solid rgba(245, 119, 46, 0.3);
-  text-align: center;
+.conta-minha-linha-total {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  padding-top: 0.4rem;
+  margin-top: 0.2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.modal-panel__individual-resultado strong {
+.conta-minha-linha-total strong {
   color: var(--laranja);
 }
 
-.modal-panel__individual-aviso {
-  color: var(--cinza-claro);
-  font-size: 0.8rem;
-  margin-top: 0.4rem;
+.conta-minha-total {
+  border-top: none;
+  padding-top: 0;
+  margin-bottom: 0.8rem;
+  font-size: 1rem;
 }
+
+.conta-minha-fechar {
+  width: 100%;
+  font-size: 0.95rem;
+  padding: 0.75rem 1rem;
+}
+
+.conta-minha-aviso {
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  background: rgba(245, 119, 46, 0.1);
+  border: 1px solid rgba(245, 119, 46, 0.3);
+  color: var(--cinza-claro);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.conta-minha-aviso strong {
+  color: var(--laranja);
+}
+
+.conta-minha-aviso--pago {
+  background: rgba(107, 217, 122, 0.1);
+  border-color: rgba(107, 217, 122, 0.3);
+}
+
+.conta-minha-aviso--pago strong {
+  color: #6bd97a;
+}
+
+.conta-pessoas {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+}
+
+.conta-pessoas li {
+  font-size: 0.88rem;
+}
+
+.conta-pessoas__linha-principal {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.conta-pessoas__detalhe {
+  color: var(--cinza-claro);
+  font-size: 0.76rem;
+  margin-top: 0.1rem;
+}
+
+.conta-pessoas__status {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-left: 0.4rem;
+}
+
+.conta-pessoas__status--em_aberto { color: #ff6b6b; }
+.conta-pessoas__status--aguardando { color: var(--laranja-forte); }
+.conta-pessoas__status--pago { color: #6bd97a; }
 
 .btn--secondary {
   background: transparent;

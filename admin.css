@@ -233,6 +233,27 @@ textarea.admin-produto-card__input {
 }
 
 /* ========================================
+   CONFIGURAÇÕES (taxa de serviço — ver supabase/010_taxa_servico_configuravel.sql)
+======================================== */
+.admin-config-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  max-width: 320px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  background: var(--preto-2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.admin-config-aviso {
+  color: var(--cinza-claro);
+  font-size: 0.78rem;
+}
+
+/* ========================================
    MESAS (token do QR code — ver supabase/005_seguranca.sql)
 ======================================== */
 .admin-toolbar--mesas {
