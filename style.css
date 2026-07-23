@@ -1107,6 +1107,30 @@ body.is-offline .header {
   width: min(460px, 92vw);
 }
 
+/* O conteúdo (Minha parte + Conta da mesa) é o único trecho que rola dentro
+   do modal — header e botões (Cancelar/Fechar a conta toda) ficam sempre
+   visíveis. min-height:0 é necessário pro item flex conseguir encolher e
+   rolar (senão ele cresce pra caber o conteúdo inteiro, e o modal transborda
+   pra fora da tela — era exatamente esse o bug). */
+.conta-conteudo {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.6rem;
+  margin-right: -0.6rem;
+  scrollbar-gutter: stable;
+}
+
+/* Dentro do conteúdo rolável, as listas de itens (.modal-panel__itens é
+   reaproveitada aqui) não devem mais rolar por conta própria — só existe UMA
+   área de rolagem agora, que é o .conta-conteudo acima. */
+.modal-panel--conta .modal-panel__itens {
+  flex: none;
+  overflow-y: visible;
+  padding-right: 0;
+  margin-right: 0;
+}
+
 .conta-secao {
   margin-bottom: 1.3rem;
   padding-bottom: 1.3rem;
