@@ -1,100 +1,109 @@
-// ========================================
-// DADOS DO CARDÁPIO
-// ========================================
-
-const drinks = [
-  { nome: 'Caipirinha', desc: 'Cachaça, limão fresco, açúcar e gelo na medida certa.', preco: 18, /* imagem: 'img/Caipirinha.jpg' */ },
-  { nome: 'Moscow Mule', desc: 'Vodka, gengibre, limão e ginger beer geladinha.', preco: 24 },
-  { nome: 'Gin Tônica', desc: 'Gin premium, tônica artesanal e toque cítrico.', preco: 26 },
-  { nome: 'Aperol Spritz', desc: 'Aperol, espumante e um splash de água com gás.', preco: 28 },
-  { nome: 'Negroni', desc: 'Gin, vermute rosso e Campari em partes iguais.', preco: 27 },
-  { nome: 'Mojito', desc: 'Rum, hortelã fresca, limão, açúcar e água com gás.', preco: 25 },
-  { nome: 'Piña Colada', desc: 'Rum, leite de coco e abacaxi batido com gelo.', preco: 26 },
-  { nome: 'Sex on the Beach', desc: 'Vodka, licor de pêssego, suco de laranja e cranberry.', preco: 24 },
-];
-
-const cervejas = [
-  { nome: 'Heineken Long Neck', desc: 'Lager holandesa, leve e refrescante.', preco: 13 },
-  { nome: 'Original 600ml', desc: 'Pilsen puro malte, clássica pra dividir com a galera.', preco: 18 },
-  { nome: 'Brahma Duplo Malte', desc: 'Encorpada e cremosa, fácil de tomar.', preco: 10 },
-  { nome: 'Budweiser Long Neck', desc: 'Lager americana, suave e refrescante.', preco: 11 },
-  { nome: 'Colorado Indica IPA', desc: 'IPA brasileira com mel, lupulada e amarga.', preco: 22 },
-  { nome: 'Eisenbahn Weizenbier', desc: 'Weiss brasileira, turva com notas de banana e cravo.', preco: 16 },
-];
-
-const narguile = [
-  { nome: 'Narguile Completo', desc: 'Montagem completa com essência à sua escolha.', preco: 45 },
-  { nome: 'Troca de Rosh', desc: 'Rosh novo com essência renovada.', preco: 20 },
-  { nome: 'Carvão Extra', desc: 'Porção adicional de carvão natural.', preco: 8 },
-  { nome: 'Essência Dupla', desc: 'Mescla de duas essências no mesmo narguile.', preco: 10 },
-];
-
-const semAlcool = [
-  { nome: 'Refrigerante Lata', desc: 'Coca, Guaraná, Fanta ou Sprite gelados.', preco: 7 },
-  { nome: 'Suco Natural', desc: 'Feito na hora: laranja, abacaxi ou maracujá.', preco: 12 },
-  { nome: 'Água Mineral', desc: 'Com ou sem gás, 500ml gelada.', preco: 5 },
-  { nome: 'Energético', desc: 'Lata gelada, ideal pra acompanhar o narguile.', preco: 15 },
-]
-
-
-const essencias = [
-  { nome: 'Menta Ice', tag: 'Refrescante' },
-  { nome: 'Melancia', tag: 'Doce' },
-  { nome: 'Uva', tag: 'Frutado' },
-  { nome: 'Frutas Vermelhas', tag: 'Frutado' },
-  { nome: 'Blueberry', tag: 'Doce' },
-  { nome: 'Maçã Verde', tag: 'Cítrico' },
-  { nome: 'Limão Gelado', tag: 'Cítrico' },
-  { nome: 'Duplo Menta', tag: 'Refrescante' },
-  { nome: 'Abacaxi', tag: 'Tropical' },
-  { nome: 'Tutti-Frutti', tag: 'Doce' },
-];
+import { supabase } from './supabaseClient.js';
 
 // ========================================
-// RENDERIZAÇÃO DOS CARDS
+// FORMATAÇÃO
 // ========================================
 
 // Formata número em Real brasileiro
 function formatarPreco(valor) {
-  return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  return Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-// Cria o HTML de um card de bebida/narguile e injeta no container
-// (data-nome/data-preco no botão são lidos pelo carrinho na seção de pedidos, mais abaixo)
-// <img class="card__img" src="${item.imagem}" alt="${item.nome}" loading="lazy">
+// ========================================
+// CARREGAMENTO DO CARDÁPIO (Supabase)
+// ========================================
+//
+// O cardápio não é mais fixo no JS: vem da tabela "produtos" (ver
+// supabase/001_schema.sql). O RLS só deixa o cliente (anon) ler produtos
+// com ativo = true, então essa consulta já vem filtrada pelo próprio banco.
+
+const cardapioCarregandoEl = document.getElementById('cardapioCarregando');
+const cardapioErroEl = document.getElementById('cardapioErro');
+const cardapioTentarBtn = document.getElementById('cardapioTentar');
+
+const GRID_POR_CATEGORIA = {
+  drink: 'drinks-grid',
+  cerveja: 'cervejas-grid',
+  sem_alcool: 'semAlcool-grid',
+  narguile: 'narguile-grid',
+};
+
+// Cria o HTML de um card de bebida/narguilé e injeta no container
+// (data-produto-id no botão é o que a RPC criar_pedido recebe; data-nome/data-preco
+// só alimentam a exibição do carrinho — o preço real é sempre recalculado no banco)
 function renderizarCardsBebida(lista, containerId) {
   const container = document.getElementById(containerId);
   container.innerHTML = lista.map(item => `
     <div class="card fade-in">
-      <div class="card__header">     
+      <div class="card__header">
         <span class="card__name">${item.nome}</span>
         <span class="card__price">${formatarPreco(item.preco)}</span>
       </div>
-      <p class="card__desc">${item.desc}</p>
-      <button class="btn btn--add" data-nome="${item.nome}" data-preco="${item.preco}">Adicionar</button>
+      <p class="card__desc">${item.descricao}</p>
+      <button class="btn btn--add" data-produto-id="${item.id}" data-nome="${item.nome}" data-preco="${item.preco}">Adicionar</button>
     </div>
   `).join('');
 }
 
 // Cria o HTML de um card de essência e injeta no container
-// Essências não têm preço próprio no cardápio (o custo já está no narguile),
+// Essências não têm preço próprio no cardápio (o custo já está no narguilé),
 // então entram no carrinho com preço 0 — servem só pra registrar a escolha do cliente.
 function renderizarCardsEssencia(lista, containerId) {
   const container = document.getElementById(containerId);
   container.innerHTML = lista.map(item => `
     <div class="essencia-card fade-in">
       <p class="essencia-card__name">${item.nome}</p>
-      <span class="essencia-card__tag">${item.tag}</span>
-      <button class="btn btn--add essencia-card__add" data-nome="${item.nome}" data-preco="0">Adicionar</button>
+      <span class="essencia-card__tag">${item.descricao}</span>
+      <button class="btn btn--add essencia-card__add" data-produto-id="${item.id}" data-nome="${item.nome}" data-preco="0">Adicionar</button>
     </div>
   `).join('');
 }
 
-renderizarCardsBebida(drinks, 'drinks-grid');
-renderizarCardsBebida(cervejas, 'cervejas-grid');
-renderizarCardsBebida(narguile, 'narguile-grid');
-renderizarCardsBebida(semAlcool, 'semAlcool-grid');
-renderizarCardsEssencia(essencias, 'essencias-grid');
+function agruparPorCategoria(produtos) {
+  const grupos = { drink: [], cerveja: [], sem_alcool: [], narguile: [], essencia: [] };
+  produtos.forEach(produto => {
+    if (grupos[produto.categoria]) grupos[produto.categoria].push(produto);
+  });
+  return grupos;
+}
+
+function renderizarTodoCardapio(produtos) {
+  const grupos = agruparPorCategoria(produtos);
+
+  Object.entries(GRID_POR_CATEGORIA).forEach(([categoria, gridId]) => {
+    renderizarCardsBebida(grupos[categoria], gridId);
+  });
+  renderizarCardsEssencia(grupos.essencia, 'essencias-grid');
+
+  observarFadeIns();
+}
+
+// Busca o cardápio no Supabase; mostra "carregando" e, se falhar, um erro
+// amigável com botão pra tentar de novo (sem precisar recarregar a página toda)
+async function carregarCardapio() {
+  cardapioCarregandoEl.style.display = 'block';
+  cardapioErroEl.style.display = 'none';
+
+  try {
+    const { data, error } = await supabase
+      .from('produtos')
+      .select('id, nome, descricao, preco, categoria')
+      .eq('ativo', true)
+      .order('ordem');
+
+    if (error) throw error;
+
+    renderizarTodoCardapio(data);
+    cardapioCarregandoEl.style.display = 'none';
+  } catch (erro) {
+    console.error('Erro ao carregar cardápio:', erro);
+    cardapioCarregandoEl.style.display = 'none';
+    cardapioErroEl.style.display = 'block';
+  }
+}
+
+cardapioTentarBtn.addEventListener('click', carregarCardapio);
+carregarCardapio();
 
 // ========================================
 // ANIMAÇÃO FADE-IN AO ROLAR (IntersectionObserver)
@@ -112,25 +121,43 @@ const observer = new IntersectionObserver((entries) => {
   threshold: 0.15,
 });
 
-// Os cards são criados dinamicamente, então observamos depois da renderização
-document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+// Os elementos estáticos (títulos, textos) já existem no HTML desde o início;
+// os cards são criados depois, de forma assíncrona, então essa função é chamada
+// de novo (de propósito) sempre que o cardápio é (re)renderizado.
+function observarFadeIns() {
+  document.querySelectorAll('.fade-in').forEach(el => {
+    if (!el.classList.contains('is-visible')) observer.observe(el);
+  });
+}
+
+observarFadeIns();
 
 // ========================================
 // CARRINHO E ENVIO DE PEDIDOS
 // ========================================
 //
-// Hoje o pedido "viaja" do cardápio até o balcão via BroadcastChannel do navegador
-// (só funciona entre abas/telas do MESMO dispositivo) + localStorage (pra sobreviver
-// a um reload da tela do balcão). Se um dia o cardápio for aberto no celular do
-// cliente e o balcão ficar em outro aparelho, essa camada precisa virar algo em
-// tempo real de verdade — Firebase Realtime Database/Firestore ou Supabase Realtime
-// são boas opções, mantendo a mesma estrutura do objeto "pedido" usada aqui embaixo.
-const canalPedidos = new BroadcastChannel('aooba_pedidos');
+// O carrinho guarda produtoId + quantidade; nome/preço aqui são só pra exibição
+// (o preço que vale de verdade é recalculado dentro da RPC criar_pedido, no banco,
+// então mesmo que alguém adultere esses valores no navegador, o pedido grava certo).
+//
+// Pedido e fechamento de conta não passam mais por BroadcastChannel/localStorage:
+// vão direto pro Supabase (RPCs criar_pedido / pedir_fechamento) e a tela do
+// balcão os recebe por ali (leitura + Realtime), então funciona entre aparelhos
+// diferentes (celular do cliente + PC do balcão).
 
-let carrinho = []; // cada item: { nome, preco, quantidade }
+let carrinho = []; // cada item: { produtoId, nome, preco, quantidade }
 
 const mesaInput = document.getElementById('mesaInput');
 const mesaAviso = document.getElementById('mesaAviso');
+
+// Se a página abrir com ?mesa=5 na URL (QR code na mesa), pré-preenche o campo e
+// TRANCA ele (readonly) — o cliente não deve poder trocar de mesa manualmente
+// quando ela já veio do QR code físico da própria mesa.
+const mesaDaUrl = new URLSearchParams(window.location.search).get('mesa');
+if (mesaDaUrl) {
+  mesaInput.value = mesaDaUrl;
+  mesaInput.readOnly = true;
+}
 
 const cartFab = document.getElementById('cartFab');
 const cartBadge = document.getElementById('cartBadge');
@@ -141,6 +168,7 @@ const cartItemsEl = document.getElementById('cartItems');
 const cartEmptyEl = document.getElementById('cartEmpty');
 const cartTotalEl = document.getElementById('cartTotal');
 const cartSubmit = document.getElementById('cartSubmit');
+const cartSubmitTextoOriginal = cartSubmit.textContent;
 const toastEl = document.getElementById('toast');
 
 function abrirCarrinho() {
@@ -158,30 +186,30 @@ cartClose.addEventListener('click', fecharCarrinho);
 cartOverlay.addEventListener('click', fecharCarrinho);
 
 // Adiciona um item ao carrinho, ou soma +1 na quantidade se ele já estiver lá
-function adicionarAoCarrinho(nome, preco) {
-  const existente = carrinho.find(item => item.nome === nome);
+function adicionarAoCarrinho(produtoId, nome, preco) {
+  const existente = carrinho.find(item => item.produtoId === produtoId);
   if (existente) {
     existente.quantidade++;
   } else {
-    carrinho.push({ nome, preco, quantidade: 1 });
+    carrinho.push({ produtoId, nome, preco, quantidade: 1 });
   }
   renderizarCarrinho();
   abrirCarrinho();
 }
 
 // Soma/subtrai quantidade de um item; remove do carrinho se chegar a 0
-function alterarQuantidade(nome, delta) {
-  const item = carrinho.find(i => i.nome === nome);
+function alterarQuantidade(produtoId, delta) {
+  const item = carrinho.find(i => i.produtoId === produtoId);
   if (!item) return;
   item.quantidade += delta;
   if (item.quantidade <= 0) {
-    carrinho = carrinho.filter(i => i.nome !== nome);
+    carrinho = carrinho.filter(i => i.produtoId !== produtoId);
   }
   renderizarCarrinho();
 }
 
-function removerDoCarrinho(nome) {
-  carrinho = carrinho.filter(i => i.nome !== nome);
+function removerDoCarrinho(produtoId) {
+  carrinho = carrinho.filter(i => i.produtoId !== produtoId);
   renderizarCarrinho();
 }
 
@@ -206,10 +234,10 @@ function renderizarCarrinho() {
           <span class="cart-item__preco">${formatarPreco(item.preco)}</span>
         </div>
         <div class="cart-item__controles">
-          <button class="cart-item__btn" data-acao="menos" data-nome="${item.nome}" aria-label="Diminuir quantidade">-</button>
+          <button class="cart-item__btn" data-acao="menos" data-produto-id="${item.produtoId}" aria-label="Diminuir quantidade">-</button>
           <span class="cart-item__qtd">${item.quantidade}</span>
-          <button class="cart-item__btn" data-acao="mais" data-nome="${item.nome}" aria-label="Aumentar quantidade">+</button>
-          <button class="cart-item__remover" data-acao="remover" data-nome="${item.nome}" aria-label="Remover item">🗑</button>
+          <button class="cart-item__btn" data-acao="mais" data-produto-id="${item.produtoId}" aria-label="Aumentar quantidade">+</button>
+          <button class="cart-item__remover" data-acao="remover" data-produto-id="${item.produtoId}" aria-label="Remover item">🗑</button>
         </div>
       </div>
     `).join('');
@@ -222,17 +250,18 @@ function renderizarCarrinho() {
 cartItemsEl.addEventListener('click', (event) => {
   const botao = event.target.closest('button[data-acao]');
   if (!botao) return;
-  const { nome, acao } = botao.dataset;
-  if (acao === 'mais') alterarQuantidade(nome, 1);
-  if (acao === 'menos') alterarQuantidade(nome, -1);
-  if (acao === 'remover') removerDoCarrinho(nome);
+  const produtoId = Number(botao.dataset.produtoId);
+  const { acao } = botao.dataset;
+  if (acao === 'mais') alterarQuantidade(produtoId, 1);
+  if (acao === 'menos') alterarQuantidade(produtoId, -1);
+  if (acao === 'remover') removerDoCarrinho(produtoId);
 });
 
 // Delegação de eventos: cobre os botões "Adicionar" de todos os cards (já existentes e futuros)
 document.addEventListener('click', (event) => {
   const botao = event.target.closest('.btn--add');
   if (!botao) return;
-  adicionarAoCarrinho(botao.dataset.nome, parseFloat(botao.dataset.preco));
+  adicionarAoCarrinho(Number(botao.dataset.produtoId), botao.dataset.nome, parseFloat(botao.dataset.preco));
 });
 
 // Mostra uma mensagem rápida no rodapé da tela
@@ -243,18 +272,13 @@ function mostrarToast(mensagem) {
   mostrarToast._timer = setTimeout(() => toastEl.classList.remove('show'), 3500);
 }
 
-// Acrescenta o pedido à lista salva no localStorage (histórico usado pela tela do balcão)
-function salvarPedidoNoStorage(pedido) {
-  const pedidos = JSON.parse(localStorage.getItem('aooba_pedidos') || '[]');
-  pedidos.push(pedido);
-  localStorage.setItem('aooba_pedidos', JSON.stringify(pedidos));
-}
+// Valida a mesa, chama a RPC criar_pedido (o preço real é recalculado no banco) e,
+// se der certo, limpa o carrinho. Em erro de rede/servidor, avisa e mantém o carrinho
+// intacto pro cliente poder tentar de novo sem perder o que já tinha escolhido.
+async function fazerPedido() {
+  const mesaValor = mesaInput.value.trim();
 
-// Valida a mesa, monta o objeto do pedido, envia pro balcão e limpa o carrinho
-function fazerPedido() {
-  const mesa = mesaInput.value.trim();
-
-  if (!mesa) {
+  if (!mesaValor) {
     mesaAviso.classList.add('show');
     mesaInput.focus();
     mesaInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -267,24 +291,34 @@ function fazerPedido() {
     return;
   }
 
-  const pedido = {
-    id: `${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    tipo: 'pedido',
-    mesa,
-    itens: carrinho.map(item => ({ nome: item.nome, quantidade: item.quantidade, preco: item.preco })),
-    total: calcularTotalCarrinho(),
-    horario: new Date().toISOString(),
-    status: 'pendente',
-  };
+  const itensPayload = carrinho.map(item => ({
+    produto_id: item.produtoId,
+    quantidade: item.quantidade,
+  }));
 
-  canalPedidos.postMessage(pedido); // avisa o balcão na hora, se estiver aberto
-  salvarPedidoNoStorage(pedido); // garante que o balcão vê o pedido mesmo se abrir depois
+  cartSubmit.disabled = true;
+  cartSubmit.textContent = 'Enviando...';
 
-  mostrarToast('Pedido enviado! O garçom já foi avisado.');
+  try {
+    const { error } = await supabase.rpc('criar_pedido', {
+      p_mesa: Number(mesaValor),
+      p_itens: itensPayload,
+    });
 
-  carrinho = [];
-  renderizarCarrinho();
-  fecharCarrinho();
+    if (error) throw error;
+
+    mostrarToast('Pedido enviado! O garçom já foi avisado.');
+    carrinho = [];
+    renderizarCarrinho();
+    fecharCarrinho();
+  } catch (erro) {
+    console.error('Erro ao enviar pedido:', erro);
+    mostrarToast('O pedido NÃO foi enviado. Verifique sua conexão e tente de novo.');
+    // Carrinho é mantido de propósito — o cliente não perde o que já tinha escolhido.
+  } finally {
+    cartSubmit.disabled = false;
+    cartSubmit.textContent = cartSubmitTextoOriginal;
+  }
 }
 
 cartSubmit.addEventListener('click', fazerPedido);
@@ -296,10 +330,7 @@ mesaInput.addEventListener('input', () => {
 // ========================================
 // FECHAR CONTA
 // ========================================
-//
-// Envia pelo mesmo canal do pedido, mas com tipo "fechar_conta" pra o balcão
-// distinguir e mostrar um alerta diferente (o cálculo do total da mesa é
-// feito lá, somando os pedidos já salvos no localStorage).
+
 const fecharContaBtn = document.getElementById('fecharContaBtn');
 const fecharContaOverlay = document.getElementById('fecharContaOverlay');
 const fecharContaModal = document.getElementById('fecharContaModal');
@@ -311,54 +342,44 @@ const fecharContaClose = document.getElementById('fecharContaClose');
 const fecharContaCancelar = document.getElementById('fecharContaCancelar');
 const fecharContaConfirmar = document.getElementById('fecharContaConfirmar');
 
-// Junta todos os pedidos já feitos pela mesa e agrupa os itens (somando quantidades repetidas)
-// Ignora pedidos "finalizado" (conta já fechada antes) pra uma mesa reaproveitada não
-// arrastar o consumo de clientes anteriores.
-function obterContaDaMesa(mesa) {
-  const salvos = JSON.parse(localStorage.getItem('aooba_pedidos') || '[]');
-  const pedidosDaMesa = salvos.filter(pedido =>
-    (pedido.tipo === 'pedido' || !pedido.tipo) &&
-    String(pedido.mesa) === String(mesa) &&
-    pedido.status !== 'finalizado'
-  );
-
-  const itensAgrupados = {};
-  pedidosDaMesa.forEach(pedido => {
-    pedido.itens.forEach(item => {
-      if (!itensAgrupados[item.nome]) {
-        itensAgrupados[item.nome] = { nome: item.nome, quantidade: 0, preco: item.preco };
-      }
-      itensAgrupados[item.nome].quantidade += item.quantidade;
-    });
-  });
-
-  return {
-    itens: Object.values(itensAgrupados),
-    total: pedidosDaMesa.reduce((soma, pedido) => soma + pedido.total, 0),
-  };
-}
-
-function abrirModalFecharConta(mesa) {
-  const conta = obterContaDaMesa(mesa);
+// Abre o modal na hora (com "consultando...") e preenche assim que a RPC conta_da_mesa
+// responder. Ela já ignora pedidos "finalizado", então uma mesa reaproveitada não
+// arrasta o consumo de um cliente anterior.
+async function abrirModalFecharConta(mesa) {
   fecharContaMesaEl.textContent = mesa;
-
-  if (conta.itens.length === 0) {
-    fecharContaVazioEl.style.display = 'block';
-    fecharContaItensEl.innerHTML = '';
-  } else {
-    fecharContaVazioEl.style.display = 'none';
-    fecharContaItensEl.innerHTML = conta.itens.map(item => `
-      <li class="modal-panel__item">
-        <span>${item.quantidade}x ${item.nome}</span>
-        <span>${formatarPreco(item.preco * item.quantidade)}</span>
-      </li>
-    `).join('');
-  }
-
-  fecharContaTotalEl.textContent = formatarPreco(conta.total);
+  fecharContaItensEl.innerHTML = '';
+  fecharContaVazioEl.textContent = 'Consultando conta...';
+  fecharContaVazioEl.style.display = 'block';
+  fecharContaTotalEl.textContent = formatarPreco(0);
 
   fecharContaOverlay.classList.add('is-open');
   fecharContaModal.classList.add('is-open');
+
+  try {
+    const { data: conta, error } = await supabase.rpc('conta_da_mesa', { p_mesa: Number(mesa) });
+
+    if (error) throw error;
+
+    if (!conta.itens || conta.itens.length === 0) {
+      fecharContaVazioEl.textContent = 'Nenhum pedido registrado para essa mesa.';
+      fecharContaVazioEl.style.display = 'block';
+    } else {
+      fecharContaVazioEl.style.display = 'none';
+      fecharContaItensEl.innerHTML = conta.itens.map(item => `
+        <li class="modal-panel__item">
+          <span>${item.quantidade}x ${item.nome}</span>
+          <span>${formatarPreco(item.preco * item.quantidade)}</span>
+        </li>
+      `).join('');
+    }
+
+    fecharContaTotalEl.textContent = formatarPreco(conta.total);
+  } catch (erro) {
+    console.error('Erro ao consultar conta da mesa:', erro);
+    fecharContaItensEl.innerHTML = '';
+    fecharContaVazioEl.textContent = 'Não foi possível consultar a conta agora. Verifique sua conexão e tente de novo.';
+    fecharContaVazioEl.style.display = 'block';
+  }
 }
 
 function fecharModalFecharConta() {
@@ -380,26 +401,27 @@ function fecharConta() {
   abrirModalFecharConta(mesa);
 }
 
-// Só dispara o pedido de fechamento depois que o cliente confirma no modal
-function confirmarFecharConta() {
+// Só dispara o pedido de fechamento depois que o cliente confirma no modal.
+// pedir_fechamento evita duplicar: se já existir um fechamento pendente pra essa
+// mesa, o banco devolve o mesmo registro em vez de criar um novo alerta no balcão.
+async function confirmarFecharConta() {
   const mesa = mesaInput.value.trim();
 
-  const fechamento = {
-    id: `${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    tipo: 'fechar_conta',
-    mesa,
-    horario: new Date().toISOString(),
-    status: 'pendente',
-  };
+  fecharContaConfirmar.disabled = true;
 
-  canalPedidos.postMessage(fechamento); // avisa o balcão na hora, se estiver aberto
-  // Salva na mesma lista 'aooba_pedidos' (reaproveitando salvarPedidoNoStorage) já que o
-  // objeto tem tipo: 'fechar_conta' pra se distinguir dos pedidos normais — assim o balcão
-  // recupera o pedido de fechamento mesmo se a tela estiver fechada ou for recarregada.
-  salvarPedidoNoStorage(fechamento);
+  try {
+    const { error } = await supabase.rpc('pedir_fechamento', { p_mesa: Number(mesa) });
 
-  fecharModalFecharConta();
-  mostrarToast('Pedido de fechamento enviado! O garçom já foi avisado.');
+    if (error) throw error;
+
+    fecharModalFecharConta();
+    mostrarToast('Pedido de fechamento enviado! O garçom já foi avisado.');
+  } catch (erro) {
+    console.error('Erro ao pedir fechamento:', erro);
+    mostrarToast('Não foi possível enviar o pedido de fechamento. Verifique sua conexão e tente de novo.');
+  } finally {
+    fecharContaConfirmar.disabled = false;
+  }
 }
 
 fecharContaBtn.addEventListener('click', fecharConta);

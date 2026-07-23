@@ -14,46 +14,66 @@
 </head>
 <body>
 
-  <!-- ===== HEADER (mesma identidade visual do cardápio) ===== -->
-  <header class="header balcao-header">
-    <nav class="nav container">
-      <span class="nav__logo">AOOBA! <span class="balcao-header__tag">— Balcão</span></span>
-      <div class="balcao-header__acoes">
-        <span class="balcao-header__som-aviso" id="somAviso">Clique em "Ativar som" pra não perder os avisos de pedido</span>
-        <span class="balcao-header__contador">Pedidos pendentes: <strong id="contadorPedidos">0</strong></span>
-        <button class="btn btn--secondary balcao-header__som" id="ativarSomBtn">🔔 Ativar som</button>
-        <button class="btn btn--secondary balcao-header__historico" id="historicoBtn">Histórico</button>
-      </div>
-    </nav>
-  </header>
-
-  <!-- ===== FILA DE PEDIDOS ===== -->
-  <main class="balcao-main container">
-    <div class="fechamento-grid" id="fechamentoGrid">
-      <!-- Cards de fechamento de conta gerados via JS -->
-    </div>
-    <p class="balcao-vazio" id="balcaoVazio">Nenhum pedido pendente no momento.</p>
-    <div class="balcao-grid" id="balcaoGrid">
-      <!-- Cards de pedido gerados via JS -->
-    </div>
-  </main>
-
-  <!-- ===== MODAL: HISTÓRICO DE PEDIDOS ===== -->
-  <div class="modal-overlay" id="historicoOverlay"></div>
-  <div class="modal-panel modal-panel--historico" id="historicoModal" role="dialog" aria-modal="true" aria-labelledby="historicoTitulo">
-    <div class="modal-panel__header">
-      <span class="modal-panel__title" id="historicoTitulo">Histórico de Pedidos</span>
-      <button class="modal-panel__close" id="historicoClose" aria-label="Fechar">&times;</button>
-    </div>
-    <div class="modal-panel__filtro">
-      <label for="historicoFiltroData">Filtrar por data:</label>
-      <input type="date" id="historicoFiltroData">
-      <button class="modal-panel__filtro-limpar" id="historicoFiltroLimpar" type="button">Limpar</button>
-    </div>
-    <p class="modal-panel__vazio" id="historicoVazio">Nenhum pedido registrado ainda.</p>
-    <div class="modal-panel__itens" id="historicoLista"></div>
+  <!-- ===== LOGIN (nada aparece sem sessão autenticada) ===== -->
+  <div class="login-tela" id="loginTela">
+    <form class="login-card" id="loginForm" novalidate>
+      <h1 class="login-card__titulo">AOOBA! <span>— Balcão</span></h1>
+      <label for="loginEmail">E-mail</label>
+      <input type="email" id="loginEmail" autocomplete="username" required>
+      <label for="loginSenha">Senha</label>
+      <input type="password" id="loginSenha" autocomplete="current-password" required>
+      <p class="login-card__erro" id="loginErro" role="alert" style="display: none;"></p>
+      <button type="submit" class="btn btn--primary login-card__entrar" id="loginEntrarBtn">Entrar</button>
+    </form>
   </div>
 
-  <script src="balcao.js"></script>
+  <!-- ===== CONTEÚDO DO BALCÃO (só aparece com sessão logada) ===== -->
+  <div id="balcaoConteudo" style="display: none;">
+
+    <!-- ===== HEADER (mesma identidade visual do cardápio) ===== -->
+    <header class="header balcao-header">
+      <nav class="nav container">
+        <span class="nav__logo">AOOBA! <span class="balcao-header__tag">— Balcão</span></span>
+        <div class="balcao-header__acoes">
+          <span class="balcao-header__conexao" id="conexaoStatus">🟡 Conectando...</span>
+          <span class="balcao-header__som-aviso" id="somAviso">Clique em "Ativar som" pra não perder os avisos de pedido</span>
+          <span class="balcao-header__contador">Pedidos pendentes: <strong id="contadorPedidos">0</strong></span>
+          <button class="btn btn--secondary balcao-header__som" id="ativarSomBtn" aria-pressed="false">🔔 Ativar som</button>
+          <button class="btn btn--secondary balcao-header__historico" id="historicoBtn">Histórico</button>
+          <button class="btn btn--secondary balcao-header__sair" id="sairBtn">Sair</button>
+        </div>
+      </nav>
+    </header>
+
+    <!-- ===== FILA DE PEDIDOS ===== -->
+    <main class="balcao-main container">
+      <div class="fechamento-grid" id="fechamentoGrid">
+        <!-- Cards de fechamento de conta gerados via JS -->
+      </div>
+      <p class="balcao-vazio" id="balcaoVazio">Nenhum pedido pendente no momento.</p>
+      <div class="balcao-grid" id="balcaoGrid">
+        <!-- Cards de pedido gerados via JS -->
+      </div>
+    </main>
+
+    <!-- ===== MODAL: HISTÓRICO DE PEDIDOS ===== -->
+    <div class="modal-overlay" id="historicoOverlay"></div>
+    <div class="modal-panel modal-panel--historico" id="historicoModal" role="dialog" aria-modal="true" aria-labelledby="historicoTitulo">
+      <div class="modal-panel__header">
+        <span class="modal-panel__title" id="historicoTitulo">Histórico de Pedidos</span>
+        <button class="modal-panel__close" id="historicoClose" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="modal-panel__filtro">
+        <label for="historicoFiltroData">Filtrar por data:</label>
+        <input type="date" id="historicoFiltroData">
+        <button class="modal-panel__filtro-limpar" id="historicoFiltroLimpar" type="button">Limpar</button>
+      </div>
+      <p class="modal-panel__vazio" id="historicoVazio">Nenhum pedido registrado ainda.</p>
+      <div class="modal-panel__itens" id="historicoLista"></div>
+    </div>
+
+  </div>
+
+  <script type="module" src="balcao.js"></script>
 </body>
 </html>

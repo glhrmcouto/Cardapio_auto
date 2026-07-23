@@ -8,6 +8,89 @@
   top: 0; /* aqui não existe a barra de "número da mesa" do cardápio */
 }
 
+/* ========================================
+   LOGIN
+======================================== */
+.login-tela {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: var(--preto);
+}
+
+.login-card {
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 2rem 1.75rem;
+  background: var(--preto-2);
+  border: 1px solid rgba(245, 119, 46, 0.25);
+  border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.login-card__titulo {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  font-size: 1.5rem;
+  color: var(--laranja-forte);
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.login-card__titulo span {
+  color: var(--branco);
+}
+
+.login-card label {
+  font-size: 0.85rem;
+  color: var(--cinza-claro);
+  margin-bottom: -0.4rem;
+}
+
+.login-card input {
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--preto);
+  color: var(--branco);
+  font-family: var(--fonte-texto);
+  font-size: 0.95rem;
+}
+
+.login-card input:focus {
+  outline: none;
+  border-color: var(--laranja);
+}
+
+.login-card__erro {
+  color: #ff6b6b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.login-card__entrar {
+  margin-top: 0.4rem;
+  width: 100%;
+  text-align: center;
+}
+
+.balcao-header__conexao {
+  font-size: 0.85rem;
+  color: var(--cinza-claro);
+}
+
+.balcao-header__sair {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.85rem;
+}
+
 .balcao-header__tag {
   color: var(--branco);
   font-weight: 600;
@@ -26,6 +109,7 @@
 .balcao-header__acoes {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 1rem;
 }
 
@@ -37,6 +121,11 @@
 .balcao-header__som {
   padding: 0.5rem 1.1rem;
   font-size: 0.85rem;
+}
+
+.balcao-header__som[aria-pressed="true"] {
+  border-color: var(--laranja);
+  color: var(--laranja-forte);
 }
 
 .balcao-header__som-aviso {

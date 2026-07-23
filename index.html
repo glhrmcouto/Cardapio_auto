@@ -61,6 +61,12 @@
   <section class="bebidas container" id="bebidas">
     <h2 class="section-title fade-in">Cardápio de Bebidas</h2>
 
+    <p class="cardapio-status" id="cardapioCarregando">Carregando cardápio...</p>
+    <div class="cardapio-status cardapio-status--erro" id="cardapioErro" style="display: none;">
+      <p>Não foi possível carregar o cardápio agora. Verifique sua conexão e tente de novo.</p>
+      <button type="button" class="btn btn--secondary" id="cardapioTentar">Tentar novamente</button>
+    </div>
+
     <h3 class="subsection-title fade-in"> Drinks</h3>
     <div class="cards-grid" id="drinks-grid">
       <!-- Cards de drinks gerados via JS -->
@@ -176,6 +182,6 @@
   <!-- Toast de confirmação -->
   <div class="toast" id="toast"></div>
 
-  <script src="script.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>

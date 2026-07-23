@@ -137,6 +137,14 @@ img {
   border-color: var(--laranja);
 }
 
+/* Campo travado (mesa veio de ?mesa= na URL, via QR code) — não editável de propósito */
+.mesa-bar input:read-only {
+  background: var(--preto-2);
+  color: var(--cinza-claro);
+  border-color: rgba(255, 255, 255, 0.1);
+  cursor: not-allowed;
+}
+
 .mesa-bar__aviso {
   display: none;
   color: #ff6b6b;
@@ -297,6 +305,21 @@ img {
   text-align: center;
   color: var(--cinza-claro);
   line-height: 1.7;
+}
+
+/*CARDÁPIO: ESTADO DE CARREGANDO / ERRO (Supabase)*/
+.cardapio-status {
+  text-align: center;
+  color: var(--cinza-claro);
+  padding: 1.5rem 0;
+}
+
+.cardapio-status--erro {
+  color: #ff6b6b;
+}
+
+.cardapio-status--erro p {
+  margin-bottom: 0.8rem;
 }
 
 .cards-grid {
