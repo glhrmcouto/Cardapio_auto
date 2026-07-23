@@ -265,25 +265,23 @@ revoke all on function public.regenerar_token_mesa(int) from public;
 grant execute on function public.regenerar_token_mesa(int) to authenticated;
 
 -- ========================================================================
--- SELECT — lista de mesas com a URL completa (pra colar no gerador de QR)
+-- SELECT — lista de mesas com a URL completa (referência manual — o
+-- gerar-qrcodes.html normal já busca isso sozinho direto do Supabase,
+-- login de admin; isso aqui é só um jeito alternativo de conferir/exportar
+-- pelo SQL Editor, se precisar).
 -- ========================================================================
--- Troque "https://SEU-DOMINIO-AQUI" pelo domínio real do site (o mesmo
--- onde index.html está publicado) antes de rodar. Rode no SQL Editor do
--- Supabase sempre que precisar reimprimir os QR codes (ex.: depois de
--- rodar o seed acima, ou depois de regenerar o token de alguma mesa).
 
 -- Versão pra conferir a olho (número, status, link):
 select
   numero,
   ativa,
-  'https://SEU-DOMINIO-AQUI/index.html?mesa=' || numero || '&t=' || token as url
+  'https://aooba.netlify.app/index.html?mesa=' || numero || '&t=' || token as url
 from mesas
 order by numero;
 
--- Versão pra colar direto em gerar-qrcodes.html (uma linha "numero,url" por
--- mesa — copie só a coluna "linha", sem cabeçalho):
+-- Versão em "numero,url" (uma linha por mesa, sem cabeçalho):
 select
-  numero || ',' || 'https://SEU-DOMINIO-AQUI/index.html?mesa=' || numero || '&t=' || token as linha
+  numero || ',' || 'https://aooba.netlify.app/index.html?mesa=' || numero || '&t=' || token as linha
 from mesas
 where ativa = true
 order by numero;

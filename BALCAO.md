@@ -8,9 +8,7 @@ Assume Windows (é o mais comum em PC de balcão) e o navegador Google Chrome.
 Se o bar usa outro navegador (Edge, por exemplo), os passos são quase
 idênticos — só troca `chrome.exe` por `msedge.exe`.
 
-Em todo lugar abaixo que aparecer `https://SEU-DOMINIO-AQUI`, troca pelo
-domínio real onde o site foi publicado (ver [README.md](README.md) → "Publicar
-no Netlify").
+O site está publicado em **https://aooba.netlify.app/**.
 
 ---
 
@@ -23,7 +21,7 @@ sem abas, sem botão de fechar visível — só a página, ocupando a tela toda.
 2. No campo de local, cole (numa linha só, com aspas):
 
    ```
-   "C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk --kiosk-printing --incognito "https://SEU-DOMINIO-AQUI/balcao.html"
+   "C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk --kiosk-printing --incognito "https://aooba.netlify.app/balcao.html"
    ```
 
    - `--kiosk` → tela cheia, sem chrome de navegador.

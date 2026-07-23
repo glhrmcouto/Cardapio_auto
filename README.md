@@ -73,6 +73,7 @@ supabase/
   004_relatorios.sql             → RPCs de relatório (admin-only)
   005_seguranca.sql              → tabela "mesas" (token por QR code) + limites de abuso nos pedidos
   006_taxa_servico.sql           → taxa de serviço (10%) no fechamento de conta
+  007_token_conta_mesa.sql       → exige o token da mesa também em conta_da_mesa
 .github/workflows/backup.yml    → backup diário automático (pg_dump)
 BALCAO.md                       → configurar o PC do balcão em modo quiosque
 MANUAL.md                       → manual de uso pro dono/garçons, sem jargão técnico
@@ -126,6 +127,9 @@ painel do Supabase (`supabase.com/dashboard` → seu projeto → SQL Editor):
    de rodar (ou pule o seed e cadastre as mesas uma a uma pelo admin.html).
 6. **`006_taxa_servico.sql`** — adiciona os 10% de taxa de serviço ao
    fechamento de conta (só ali, não nos pedidos individuais).
+7. **`007_token_conta_mesa.sql`** — fecha o mesmo tipo de proteção da 005
+   (token da mesa) na consulta de conta usada no botão "Fechar Conta" do
+   cliente.
 
 Depois das migrações, crie os usuários de login:
 
@@ -154,13 +158,12 @@ Depois das migrações, crie os usuários de login:
    Netlify — não precisa de nenhuma configuração extra (`_redirects` só
    seria necessário se este fosse um app de página única com rotas do lado
    do cliente, o que não é o caso aqui).
-5. **Domínio**: em Site settings → Domain management, tanto dá pra usar o
-   subdomínio grátis (`algumacoisa.netlify.app`) quanto conectar um domínio
-   próprio. HTTPS é automático (Let's Encrypt) nos dois casos.
-6. Depois de saber o domínio final, atualize os placeholders
-   `https://SEU-DOMINIO-AQUI` que aparecem em: `index.html` (tags Open
-   Graph e `canonical`), `supabase/005_seguranca.sql` (os dois `SELECT` do
-   fim do arquivo, só usados como referência manual) e `BALCAO.md`.
+5. **Domínio**: o site está publicado em **https://aooba.netlify.app/**
+   (subdomínio grátis do Netlify — HTTPS automático via Let's Encrypt). Se
+   um dia trocar pra um domínio próprio, atualize as referências a esse
+   endereço em `index.html` (tags Open Graph e `canonical`),
+   `supabase/005_seguranca.sql` (os dois `SELECT` do fim do arquivo, só
+   usados como referência manual) e `BALCAO.md`.
 
 ## Onde ficam as credenciais
 

@@ -396,7 +396,7 @@ async function abrirModalFecharConta(mesa) {
   fecharContaModal.classList.add('is-open');
 
   try {
-    const { data: conta, error } = await supabase.rpc('conta_da_mesa', { p_mesa: Number(mesa) });
+    const { data: conta, error } = await supabase.rpc('conta_da_mesa', { p_mesa: Number(mesa), p_token: tokenMesa });
 
     if (error) throw error;
 
@@ -422,7 +422,9 @@ async function abrirModalFecharConta(mesa) {
     console.error('Erro ao consultar conta da mesa:', erro);
     fecharContaItensEl.innerHTML = '';
     fecharContaResumoEl.style.display = 'none';
-    fecharContaVazioEl.textContent = 'Não foi possível consultar a conta agora. Verifique sua conexão e tente de novo.';
+    // erro.message vem da RPC (ver supabase/007_token_conta_mesa.sql) quando é
+    // um erro de token/mesa — mensagem já pensada pra ser segura de mostrar.
+    fecharContaVazioEl.textContent = erro.message || 'Não foi possível consultar a conta agora. Verifique sua conexão e tente de novo.';
     fecharContaVazioEl.style.display = 'block';
   }
 }
