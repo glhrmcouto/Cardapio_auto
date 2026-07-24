@@ -10,7 +10,7 @@
 // aparelho (celular do cliente fazendo pedido enquanto o balcão fica no PC).
 
 import { supabase } from './supabaseClient.js';
-import { formatarPreco, formatarDataISO } from './shared.js';
+import { formatarPreco, formatarDataISO, escaparTexto } from './shared.js';
 
 // ========================================
 // ELEMENTOS
@@ -380,7 +380,7 @@ function renderizarPedidos() {
     <div class="pedido-card" data-id="${pedido.id}">
       <div>
         <div class="pedido-card__mesa">Mesa ${pedido.mesa}</div>
-        ${pedido.cliente_nome ? `<div class="pedido-card__cliente">${pedido.cliente_nome}</div>` : ''}
+        ${pedido.cliente_nome ? `<div class="pedido-card__cliente">${escaparTexto(pedido.cliente_nome)}</div>` : ''}
         <div class="pedido-card__horario">${formatarHorario(pedido.criado_em)}</div>
       </div>
       <ul class="pedido-card__itens">
@@ -462,7 +462,7 @@ async function renderizarFechamentos() {
           <div class="fechamento-card__pessoas-titulo">Por pessoa</div>
           ${conta.porPessoa.map(pessoa => `
             <div class="fechamento-card__linha">
-              <span>${pessoa.nome}<span class="fechamento-card__pessoa-status fechamento-card__pessoa-status--${pessoa.status}">${STATUS_LABEL_PESSOA[pessoa.status] || pessoa.status}</span></span>
+              <span>${escaparTexto(pessoa.nome)}<span class="fechamento-card__pessoa-status fechamento-card__pessoa-status--${pessoa.status}">${STATUS_LABEL_PESSOA[pessoa.status] || pessoa.status}</span></span>
               <span>${formatarPreco(pessoa.valor)}</span>
             </div>
             <div class="fechamento-card__pessoa-detalhe">Subtotal ${formatarPreco(pessoa.subtotal)} + Serviço ${formatarPreco(pessoa.taxa_servico)}</div>
@@ -561,7 +561,7 @@ async function renderizarPagamentosPendentes() {
 
     return `
     <div class="pagamento-card" data-id="${pagamento.id}">
-      <div class="pagamento-card__titulo">MESA ${pagamento.mesa} — <strong>${pagamento.nome}</strong> quer fechar: ${formatarPreco(pagamento.valor_total)}</div>
+      <div class="pagamento-card__titulo">MESA ${pagamento.mesa} — <strong>${escaparTexto(pagamento.nome)}</strong> quer fechar: ${formatarPreco(pagamento.valor_total)}</div>
       <div class="pagamento-card__horario">${formatarHorario(pagamento.criado_em)}</div>
       ${!pagamento.taxa_aceita ? '<div class="pagamento-card__sem-taxa">⚠️ Recusou a taxa de serviço</div>' : ''}
       <ul class="pagamento-card__itens">

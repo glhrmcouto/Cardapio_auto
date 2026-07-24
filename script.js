@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient.js';
-import { formatarPreco } from './shared.js';
+import { formatarPreco, escaparTexto } from './shared.js';
 
 // ========================================
 // AVISO DE SEM CONEXÃO
@@ -646,7 +646,7 @@ function renderizarContaDaMesa(conta) {
   contaPessoasListaEl.innerHTML = conta.por_pessoa.map(pessoa => `
     <li>
       <div class="conta-pessoas__linha-principal">
-        <span>${pessoa.nome}<span class="conta-pessoas__status conta-pessoas__status--${pessoa.status}">${STATUS_LABEL_PESSOA[pessoa.status] || pessoa.status}</span></span>
+        <span>${escaparTexto(pessoa.nome)}<span class="conta-pessoas__status conta-pessoas__status--${pessoa.status}">${STATUS_LABEL_PESSOA[pessoa.status] || pessoa.status}</span></span>
         <span>${formatarPreco(pessoa.valor)}</span>
       </div>
       <div class="conta-pessoas__detalhe">Subtotal ${formatarPreco(pessoa.subtotal)} + Serviço ${formatarPreco(pessoa.taxa_servico)}</div>
