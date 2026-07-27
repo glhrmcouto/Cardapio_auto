@@ -46,16 +46,34 @@ jobs:
           # postgres:17 só pra ter um pg_dump atual disponível (o runner do
           # GitHub não vem com um cliente Postgres recente pré-instalado);
           # --user evita que o dump saia com dono "root" no arquivo do runner.
+          #
+          # bash -c com "set -euo pipefail" (não "sh -c"): num pipe
+          # "pg_dump | gzip", o status de saída do sh -c é o do ÚLTIMO
+          # comando (gzip). Se o pg_dump falhar (secret errado/expirado,
+          # banco fora do ar etc.) ele sai sem escrever nada, mas o gzip
+          # recebe EOF na hora e gera um .gz "válido" só que vazio (20
+          # bytes) com exit code 0 — o workflow reporta sucesso e sobe um
+          # backup vazio sem ninguém perceber. pipefail propaga o erro do
+          # pg_dump pro sh -c e falha o step de verdade.
           docker run --rm \
             --user "$(id -u):$(id -g)" \
             -e SUPABASE_DB_URL \
             -v "$PWD:/backup" \
             postgres:17 \
-            sh -c 'pg_dump "$SUPABASE_DB_URL" --schema=public --no-owner --no-privileges | gzip > /backup/backup.sql.gz'
+            bash -c 'set -euo pipefail; pg_dump "$SUPABASE_DB_URL" --schema=public --no-owner --no-privileges | gzip > /backup/backup.sql.gz'
 
           nome_arquivo="backup-aooba-$(date +%F).sql.gz"
           mv backup.sql.gz "$nome_arquivo"
           echo "NOME_ARQUIVO=$nome_arquivo" >> "$GITHUB_ENV"
+
+          # sanidade extra: gzip de saída vazia sempre dá exatamente 20
+          # bytes, então isso pega até um pg_dump que "funcionou" mas não
+          # despejou nenhuma linha de dado.
+          tamanho=$(stat -c%s "$nome_arquivo")
+          if [ "$tamanho" -le 20 ]; then
+            echo "::error::O backup saiu vazio (arquivo de $tamanho bytes) — o pg_dump não retornou dados. Confira o secret SUPABASE_DB_URL e a conectividade com o banco."
+            exit 1
+          fi
 
       - name: Guardar backup como artifact (retenção de 30 dias)
         uses: actions/upload-artifact@v4
