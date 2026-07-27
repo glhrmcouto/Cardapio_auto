@@ -1102,6 +1102,10 @@ body.is-offline .header {
   display: block;
 }
 
+.modal-panel--nome .modal-panel__acoes {
+  margin-top: 1.2rem;
+}
+
 /*MODAL: CONTA DA MESA (seções "Minha parte" e "Conta da mesa")*/
 .modal-panel--conta {
   width: min(460px, 92vw);

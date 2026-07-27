@@ -55,17 +55,25 @@ Não tem `package.json` de propósito — não tem nada pra instalar ou buildar.
 ## Estrutura do repositório
 
 ```
-index.html / script.js          → cardápio público
-balcao.html / balcao.js         → painel do balcão
-admin.html / admin.js           → painel do dono (cardápio + mesas)
-relatorios.html / relatorios.js → painel do dono (vendas + backup manual)
-gerar-qrcodes.html / .js        → gerador de QR code das mesas
-shared.js                       → funções compartilhadas entre os .js acima
-supabaseClient.js               → cliente único do Supabase (URL + chave pública)
-style.css                       → estilos globais (variáveis de marca, componentes reaproveitados)
-admin.css / balcao.css / relatorios.css / gerar-qrcodes.css
-                                 → estilos específicos de cada painel
+index.html                      → cardápio público
+balcao.html                     → painel do balcão
+admin.html                      → painel do dono (cardápio + mesas)
+relatorios.html                 → painel do dono (vendas + backup manual)
+gerar-qrcodes.html              → gerador de QR code das mesas
 404.html                        → página de erro personalizada
+js/
+  script.js                     → lógica do cardápio público (index.html)
+  balcao.js                     → lógica do painel do balcão
+  admin.js                      → lógica do painel do dono (cardápio + mesas)
+  relatorios.js                 → lógica do painel de relatórios
+  gerar-qrcodes.js               → lógica do gerador de QR code
+  shared.js                     → funções compartilhadas entre os .js acima
+  supabaseClient.js             → cliente único do Supabase (URL + chave pública)
+css/
+  style.css                     → estilos globais (variáveis de marca, componentes reaproveitados)
+  admin.css / balcao.css / relatorios.css / gerar-qrcodes.css
+                                 → estilos específicos de cada painel
+img/                            → logo e imagens usadas no site
 supabase/
   001_schema.sql                → tabelas produtos/pedidos/pedido_itens + RPCs públicas (criar_pedido, pedir_fechamento, conta_da_mesa)
   002_realtime.sql               → habilita Realtime na tabela "pedidos"
