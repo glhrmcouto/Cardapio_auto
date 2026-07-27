@@ -273,6 +273,21 @@
     </div>
   </div>
 
+  <!-- ===== MODAL: CONTA ENCERRADA (mesa virou de cliente enquanto a página ficou aberta) ===== -->
+  <!-- Sem botão de fechar/cancelar de propósito, igual o nomeModal obrigatório:
+       a pessoa precisa tocar em "Iniciar novo pedido" pra liberar a tela de novo
+       (ver supabase/014_sessao_vinculada.sql e js/script.js, mostrarContaEncerrada). -->
+  <div class="modal-overlay" id="contaEncerradaOverlay"></div>
+  <div class="modal-panel modal-panel--nome" id="contaEncerradaModal" role="dialog" aria-modal="true" aria-labelledby="contaEncerradaTitulo">
+    <div class="modal-panel__header">
+      <span class="modal-panel__title" id="contaEncerradaTitulo">Conta encerrada</span>
+    </div>
+    <p class="nome-modal__texto">Esta conta foi encerrada. Se você acabou de sentar, toque no botão abaixo pra começar um novo pedido.</p>
+    <div class="modal-panel__acoes">
+      <button type="button" class="btn btn--primary" id="contaEncerradaIniciarBtn">Iniciar novo pedido</button>
+    </div>
+  </div>
+
   <!-- Toast de confirmação -->
   <div class="toast" id="toast"></div>
 
