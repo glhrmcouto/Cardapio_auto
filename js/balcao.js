@@ -46,6 +46,18 @@ const historicoClose = document.getElementById('historicoClose');
 const historicoFiltroData = document.getElementById('historicoFiltroData');
 const historicoFiltroLimpar = document.getElementById('historicoFiltroLimpar');
 
+const toastEl = document.getElementById('toast');
+
+// Aviso discreto no rodapé (mesmo padrão de js/script.js) — usado hoje só
+// pro encerramento automático de sessão (ver confirmarRecebimentoPagamento
+// e supabase/015_encerramento_automatico.sql).
+function mostrarToast(mensagem) {
+  toastEl.textContent = mensagem;
+  toastEl.classList.add('show');
+  clearTimeout(mostrarToast._timer);
+  mostrarToast._timer = setTimeout(() => toastEl.classList.remove('show'), 3500);
+}
+
 const STATUS_LABEL_PESSOA = { em_aberto: 'Em aberto', aguardando: 'Aguardando', pago: 'Pago' };
 
 let pedidos = []; // só os pedidos com status "pendente" — cada um já vem com .itens embutido
@@ -504,6 +516,15 @@ async function tentarEncerrarSessao(mesa) {
 
   if (!error) return true;
 
+  if (error.details === 'CONTA_JA_ENCERRADA') {
+    // Não é erro de verdade: a sessão provavelmente já foi fechada sozinha
+    // pelo encerramento automático (ver supabase/015_encerramento_automatico.sql)
+    // enquanto esse card ainda estava na tela — avisa sem alarde e segue o
+    // fluxo normal (finalizarFechamento limpa a UI local do mesmo jeito).
+    alert(error.message);
+    return true;
+  }
+
   if (error.message && error.message.startsWith('Ainda falta receber')) {
     const confirmou = confirm(`${error.message}\n\nFechar a conta mesmo assim?`);
     if (!confirmou) return false;
@@ -617,7 +638,7 @@ async function confirmarRecebimentoPagamento(id) {
     botao.textContent = 'Marcando...';
   }
 
-  const { error } = await supabase.rpc('confirmar_pagamento', { p_pagamento_id: id });
+  const { data, error } = await supabase.rpc('confirmar_pagamento', { p_pagamento_id: id });
 
   if (error) {
     console.error('Erro ao confirmar pagamento:', error);
@@ -630,6 +651,20 @@ async function confirmarRecebimentoPagamento(id) {
   }
 
   pagamentosPendentes = pagamentosPendentes.filter(p => p.id !== id);
+
+  // Essa pode ter sido a última pendência da sessão — o banco já encerrou
+  // ela sozinho na mesma transação (ver supabase/015_encerramento_automatico.sql).
+  // Mesmo raciocínio de finalizarFechamento (fechamento manual): limpa o
+  // estado local da mesa na hora, sem esperar o Realtime ir e voltar, pra
+  // não desenhar por um instante um card de mesa/pedido que já foi encerrado.
+  if (data && data.sessao_encerrada) {
+    pedidos = pedidos.filter(pedido => String(pedido.mesa) !== String(data.mesa));
+    fechamentos = fechamentos.filter(f => String(f.mesa) !== String(data.mesa));
+    mesasAtivas = mesasAtivas.filter(s => String(s.mesa) !== String(data.mesa));
+    renderizarPedidos();
+    mostrarToast(`Mesa ${data.mesa} quitada e encerrada automaticamente.`);
+  }
+
   await renderizarPagamentosPendentes();
   // O card de "Conta Fechada" da mesa e o de "Mesas Ativas" mostram Total/
   // Pago/Falta calculado em cima dos pagamentos — sem isso, ficavam com o
