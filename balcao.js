@@ -10,7 +10,7 @@
 // aparelho (celular do cliente fazendo pedido enquanto o balcão fica no PC).
 
 import { supabase } from './supabaseClient.js';
-import { formatarPreco, formatarDataISO, escaparTexto } from './shared.js';
+import { formatarPreco, escaparTexto } from './shared.js';
 
 // ========================================
 // ELEMENTOS
@@ -34,6 +34,8 @@ const balcaoVazio = document.getElementById('balcaoVazio');
 const contadorPedidos = document.getElementById('contadorPedidos');
 const fechamentoGrid = document.getElementById('fechamentoGrid');
 const pagamentoGrid = document.getElementById('pagamentoGrid');
+const mesasAtivasGrid = document.getElementById('mesasAtivasGrid');
+const mesasAtivasVazio = document.getElementById('mesasAtivasVazio');
 
 const historicoBtn = document.getElementById('historicoBtn');
 const historicoOverlay = document.getElementById('historicoOverlay');
@@ -49,6 +51,7 @@ const STATUS_LABEL_PESSOA = { em_aberto: 'Em aberto', aguardando: 'Aguardando', 
 let pedidos = []; // só os pedidos com status "pendente" — cada um já vem com .itens embutido
 let fechamentos = []; // pedidos de "fechar conta" (mesa inteira) ainda não atendidos
 let pagamentosPendentes = []; // pagamentos parciais ("fechar minha parte") ainda não confirmados
+let mesasAtivas = []; // sessões com status "aberta" — uma por mesa ocupada agora
 
 function formatarHorario(iso) {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -56,11 +59,6 @@ function formatarHorario(iso) {
 
 function formatarData(iso) {
   return new Date(iso).toLocaleDateString('pt-BR');
-}
-
-// Data local no formato yyyy-mm-dd, pra comparar com o valor do <input type="date">
-function obterDataLocal(iso) {
-  return formatarDataISO(new Date(iso));
 }
 
 // ========================================
@@ -133,9 +131,11 @@ supabase.auth.onAuthStateChange((_evento, session) => {
     pedidos = [];
     fechamentos = [];
     pagamentosPendentes = [];
+    mesasAtivas = [];
     renderizarPedidos();
     fechamentoGrid.innerHTML = '';
     pagamentoGrid.innerHTML = '';
+    mesasAtivasGrid.innerHTML = '';
     mostrarTelaLogin();
   }
 });
@@ -306,6 +306,20 @@ async function carregarPagamentosPendentes() {
   pagamentosPendentes = data.map(p => ({ ...p, mesa: p.sessoes ? p.sessoes.mesa : null }));
 }
 
+// Toda mesa com sessão aberta agora, ocupada ou não (ver supabase/008_sessoes.sql)
+// — é essa lista que vira o painel "Mesas Ativas", pra mostrar o consumo de
+// cada mesa mesmo antes de alguém pedir pra fechar a conta.
+async function carregarMesasAtivas() {
+  const { data, error } = await supabase
+    .from('sessoes')
+    .select('id, mesa, aberta_em')
+    .eq('status', 'aberta')
+    .order('mesa');
+
+  if (error) throw error;
+  mesasAtivas = data;
+}
+
 async function carregarTudoInicial() {
   balcaoErroEl.style.display = 'none';
 
@@ -314,12 +328,14 @@ async function carregarTudoInicial() {
       carregarPedidosPendentes(),
       carregarFechamentosPendentes(),
       carregarPagamentosPendentes(),
+      carregarMesasAtivas(),
     ]);
   } catch (erro) {
     console.error('Erro ao carregar pedidos/fechamentos:', erro);
     balcaoGrid.innerHTML = '';
     fechamentoGrid.innerHTML = '';
     pagamentoGrid.innerHTML = '';
+    mesasAtivasGrid.innerHTML = '';
     balcaoVazio.style.display = 'none';
     balcaoErroEl.style.display = 'block';
     return;
@@ -328,6 +344,7 @@ async function carregarTudoInicial() {
   renderizarPedidos();
   await renderizarPagamentosPendentes();
   await renderizarFechamentos();
+  await renderizarMesasAtivas();
 }
 
 balcaoTentarBtn.addEventListener('click', carregarTudoInicial);
@@ -533,8 +550,13 @@ async function finalizarFechamento(id) {
 
   fechamentos = fechamentos.filter(f => f.id !== id);
   pedidos = pedidos.filter(pedido => String(pedido.mesa) !== String(fechamento.mesa));
+  // Tira a mesa de "Mesas Ativas" na hora, sem esperar o Realtime da tabela
+  // "sessoes" ir e voltar (que também cobre esse mesmo caso, pra quando o
+  // fechamento é feito por OUTRO aparelho/aba).
+  mesasAtivas = mesasAtivas.filter(s => String(s.mesa) !== String(fechamento.mesa));
   renderizarPedidos();
   await renderizarFechamentos();
+  await renderizarMesasAtivas();
 }
 
 fechamentoGrid.addEventListener('click', (event) => {
@@ -609,6 +631,12 @@ async function confirmarRecebimentoPagamento(id) {
 
   pagamentosPendentes = pagamentosPendentes.filter(p => p.id !== id);
   await renderizarPagamentosPendentes();
+  // O card de "Conta Fechada" da mesa e o de "Mesas Ativas" mostram Total/
+  // Pago/Falta calculado em cima dos pagamentos — sem isso, ficavam com o
+  // valor antigo (como se nada tivesse sido pago) até algo mais disparar um
+  // re-render.
+  await renderizarFechamentos();
+  await renderizarMesasAtivas();
 }
 
 pagamentoGrid.addEventListener('click', (event) => {
@@ -616,6 +644,67 @@ pagamentoGrid.addEventListener('click', (event) => {
   if (!botao) return;
   confirmarRecebimentoPagamento(botao.dataset.id);
 });
+
+// ========================================
+// MESAS ATIVAS (visão geral, mesa por mesa)
+// ========================================
+//
+// Uma mesa entra nessa lista assim que a sessão dela abre (primeiro pedido —
+// ver criar_pedido em supabase/008_sessoes.sql) e sai quando a sessão fecha
+// (encerrar_sessao). Reaproveita obterContaAtivaDaMesa (mesma RPC
+// conta_da_mesa_balcao do card de fechamento) pra montar itens + subtotal/
+// serviço/total/saldo de cada mesa, mesmo antes de alguém pedir pra fechar.
+
+async function renderizarMesasAtivas() {
+  if (mesasAtivas.length === 0) {
+    mesasAtivasVazio.style.display = 'block';
+    mesasAtivasGrid.innerHTML = '';
+    return;
+  }
+
+  mesasAtivasVazio.style.display = 'none';
+
+  const cards = await Promise.all(mesasAtivas.map(async sessao => {
+    const conta = await obterContaAtivaDaMesa(sessao.mesa);
+
+    return `
+    <div class="mesa-ativa-card" data-mesa="${sessao.mesa}">
+      <div class="mesa-ativa-card__mesa">Mesa ${sessao.mesa}</div>
+      <div class="mesa-ativa-card__horario">Aberta às ${formatarHorario(sessao.aberta_em)}</div>
+      ${conta.itens.length === 0
+        ? '<p class="mesa-ativa-card__vazio">Nenhum pedido registrado ainda.</p>'
+        : `<ul class="pedido-card__itens">
+            ${conta.itens.map(item => `
+              <li>
+                <span>${item.quantidade}x ${item.nome}</span>
+                <span>${formatarPreco(item.preco * item.quantidade)}</span>
+              </li>
+            `).join('')}
+          </ul>`
+      }
+      <div class="fechamento-card__saldo">
+        <span>Total <strong>${formatarPreco(conta.totalGeral)}</strong> <span class="fechamento-card__saldo-servico">(serviço ${formatarPreco(conta.taxaServico)})</span></span>
+        <span>Pago <strong>${formatarPreco(conta.totalPago)}</strong></span>
+        <span class="falta">Falta <strong>${formatarPreco(conta.saldoRestante)}</strong></span>
+      </div>
+      ${conta.porPessoa.length > 1 ? `
+        <div class="fechamento-card__pessoas">
+          <div class="fechamento-card__pessoas-titulo">Por pessoa</div>
+          ${conta.porPessoa.map(pessoa => `
+            <div class="fechamento-card__linha">
+              <span>${escaparTexto(pessoa.nome)}<span class="fechamento-card__pessoa-status fechamento-card__pessoa-status--${pessoa.status}">${STATUS_LABEL_PESSOA[pessoa.status] || pessoa.status}</span></span>
+              <span>${formatarPreco(pessoa.valor)}</span>
+            </div>
+            <div class="fechamento-card__pessoa-detalhe">Subtotal ${formatarPreco(pessoa.subtotal)} + Serviço ${formatarPreco(pessoa.taxa_servico)}</div>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+  }));
+
+  mesasAtivasGrid.innerHTML = cards.join('');
+}
 
 // ========================================
 // REALTIME (Supabase)
@@ -646,6 +735,9 @@ async function lidarComInsercao(payload) {
   pedidos.push({ ...novo, itens: error ? [] : itens });
   ordenarPedidos();
   renderizarPedidos();
+  // O card de "Mesas Ativas" dessa mesa mostra os itens/total da sessão
+  // inteira — precisa refletir esse pedido novo assim que ele chega.
+  await renderizarMesasAtivas();
   tocarBeep('pedido');
 }
 
@@ -676,18 +768,47 @@ async function lidarComInsercaoPagamento(payload) {
   const novo = payload.new;
   if (novo.status !== 'pendente') return;
 
-  const { data: sessao } = await supabase.from('sessoes').select('mesa').eq('id', novo.sessao_id).single();
+  const { data: sessao, error: erroSessao } = await supabase.from('sessoes').select('mesa').eq('id', novo.sessao_id).single();
+  if (erroSessao) console.error('Erro ao buscar mesa do pagamento novo:', erroSessao);
+
   pagamentosPendentes.push({ ...novo, mesa: sessao ? sessao.mesa : '?' });
   await renderizarPagamentosPendentes();
+  // Um pagamento pendente novo já entra na conta de "aguardando confirmação"
+  // do saldo da mesa (ver conta_da_mesa_balcao) — sem isso, "Falta" no card
+  // de fechar conta e no de "Mesas Ativas" ficava desatualizado até outra
+  // ação disparar um re-render.
+  await renderizarFechamentos();
+  await renderizarMesasAtivas();
   tocarBeep('fechamento');
 }
 
 // Cobre o caso de outro dispositivo/aba ter confirmado o recebimento antes deste.
-function lidarComAtualizacaoPagamento(payload) {
+async function lidarComAtualizacaoPagamento(payload) {
   const atualizado = payload.new;
   if (atualizado.status === 'confirmado' && pagamentosPendentes.some(p => p.id === atualizado.id)) {
     pagamentosPendentes = pagamentosPendentes.filter(p => p.id !== atualizado.id);
-    renderizarPagamentosPendentes();
+    await renderizarPagamentosPendentes();
+    await renderizarFechamentos();
+    await renderizarMesasAtivas();
+  }
+}
+
+// Uma sessão nova (mesa recém-ocupada) entra em "Mesas Ativas" assim que o
+// primeiro pedido dela é gravado (ver criar_pedido em supabase/008_sessoes.sql).
+function lidarComInsercaoSessao(payload) {
+  const novo = payload.new;
+  if (novo.status !== 'aberta' || mesasAtivas.some(s => s.id === novo.id)) return;
+  mesasAtivas.push(novo);
+  renderizarMesasAtivas();
+}
+
+// Cobre o caso de a sessão ter sido encerrada (encerrar_sessao) por qualquer
+// aparelho/aba: tira a mesa de "Mesas Ativas" sem precisar recarregar a página.
+function lidarComAtualizacaoSessao(payload) {
+  const atualizado = payload.new;
+  if (atualizado.status !== 'aberta' && mesasAtivas.some(s => s.id === atualizado.id)) {
+    mesasAtivas = mesasAtivas.filter(s => s.id !== atualizado.id);
+    renderizarMesasAtivas();
   }
 }
 
@@ -698,6 +819,8 @@ function inscreverRealtime() {
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, lidarComAtualizacao)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pagamentos' }, lidarComInsercaoPagamento)
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pagamentos' }, lidarComAtualizacaoPagamento)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sessoes' }, lidarComInsercaoSessao)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessoes' }, lidarComAtualizacaoSessao)
     .subscribe((status) => {
       estadoCanal = status;
       recalcularIndicadorConexao();
@@ -722,14 +845,34 @@ const statusLabel = {
   finalizado: 'Finalizado',
 };
 
-// Busca TODOS os pedidos (tipo "pedido", qualquer status) direto do Supabase — o filtro
-// por data é aplicado depois, no navegador, com base no fuso local (mesma lógica de sempre,
-// pra não desalinhar o dia por causa de fuso horário na comparação feita no banco).
-async function carregarHistoricoBruto() {
+// Busca só os pedidos dentro da janela pedida: um dia específico, se o filtro
+// estiver preenchido, ou os últimos 30 dias por padrão — em vez do histórico
+// inteiro do bar (que só cresce, sem limite, a cada dia que passa). O filtro é
+// aplicado direto na consulta (não mais no navegador depois de baixar tudo).
+// As datas de início/fim são instantes de meia-noite LOCAL (mesmo fuso de quem
+// está usando o balcão — o bar em si), então bate certo com o dia civil de
+// quem está filtrando, sem precisar converter fuso horário aqui.
+async function carregarHistoricoBruto(filtro) {
+  let inicio;
+  let fim;
+
+  if (filtro) {
+    const [ano, mes, dia] = filtro.split('-').map(Number);
+    inicio = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+    fim = new Date(ano, mes - 1, dia + 1, 0, 0, 0, 0);
+  } else {
+    fim = new Date();
+    fim.setHours(24, 0, 0, 0); // meia-noite de amanhã: inclui o dia de hoje inteiro
+    inicio = new Date(fim);
+    inicio.setDate(inicio.getDate() - 30);
+  }
+
   const { data, error } = await supabase
     .from('pedidos')
     .select('id, mesa, total, status, criado_em, itens:pedido_itens(nome:nome_snapshot, preco:preco_unitario, quantidade)')
     .eq('tipo', 'pedido')
+    .gte('criado_em', inicio.toISOString())
+    .lt('criado_em', fim.toISOString())
     .order('criado_em', { ascending: false });
 
   if (error) {
@@ -746,22 +889,18 @@ async function renderizarHistorico() {
   historicoVazio.textContent = 'Carregando...';
   historicoVazio.style.display = 'block';
 
-  const historicoCompleto = await carregarHistoricoBruto();
+  const historico = await carregarHistoricoBruto(filtro);
 
-  if (historicoCompleto === null) {
+  if (historico === null) {
     historicoVazio.textContent = 'Não foi possível carregar o histórico agora. Verifique sua conexão.';
     historicoVazio.style.display = 'block';
     return;
   }
 
-  const historico = filtro
-    ? historicoCompleto.filter(pedido => obterDataLocal(pedido.criado_em) === filtro)
-    : historicoCompleto;
-
   if (historico.length === 0) {
     historicoVazio.textContent = filtro
       ? 'Nenhum pedido registrado nessa data.'
-      : 'Nenhum pedido registrado ainda.';
+      : 'Nenhum pedido nos últimos 30 dias.';
     historicoVazio.style.display = 'block';
     historicoLista.innerHTML = '';
     return;

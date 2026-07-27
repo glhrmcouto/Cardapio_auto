@@ -392,6 +392,56 @@
   padding: 0.55rem 1.4rem;
 }
 
+/* ========================================
+   MESAS ATIVAS
+   (visão geral de toda mesa com sessão aberta — informativo, sem botão de
+   ação, diferente dos alertas de fechamento/pagamento acima)
+======================================== */
+.balcao-secao-titulo {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: var(--laranja-forte);
+  margin: 2rem 0 1rem;
+}
+
+.mesas-ativas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.mesa-ativa-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1.4rem;
+  background: var(--preto-2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 5px solid var(--laranja);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  animation: pedido-entra 0.4s ease;
+}
+
+.mesa-ativa-card__mesa {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  font-size: 2rem;
+  color: var(--laranja-forte);
+}
+
+.mesa-ativa-card__horario {
+  color: var(--cinza-claro);
+  font-size: 0.85rem;
+}
+
+.mesa-ativa-card__vazio {
+  color: var(--cinza-claro);
+  font-size: 0.88rem;
+}
+
 /*MODAL: HISTÓRICO DE PEDIDOS*/
 .modal-panel--historico {
   width: min(560px, 92vw);
