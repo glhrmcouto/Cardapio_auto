@@ -344,18 +344,46 @@ function mostrarAcessoBloqueado() {
   );
 }
 
-// Mesa+token da mesa válidos, mas sem sessão aberta pra essa mesa AGORA —
-// cobre tanto "a conta foi encerrada enquanto eu olhava o cardápio" (evento
-// em tempo real, ver inscreverRealtimeSessao) quanto "F5/nova visita numa
-// mesa sem ninguém sentado". Mostra "Iniciar novo pedido": só o toque nele
-// (ver abrirNovoPedido) chama abrir_sessao e libera o cardápio.
-function mostrarSemSessao() {
+// Mesa+token da mesa válidos, sem sessão aberta pra essa mesa AGORA, e ESTE
+// navegador nunca tinha guardado nenhuma sessão dela (cliente novo/mesa
+// livre) — ver mostrarSemSessaoOuEncerrada, que decide entre esta tela e
+// mostrarContaFechada. Mostra "Iniciar pedido": só o toque nele (ver
+// abrirNovoPedido) chama abrir_sessao e libera o cardápio.
+function mostrarBoasVindas() {
+  sessaoPendente = null;
+  travarTela(
+    'Bem-vindo ao AOOBA! BAR',
+    `Toque abaixo para iniciar seu pedido na Mesa ${mesaAtualValor()}.`,
+    ['iniciar']
+  );
+}
+
+// Mesma falta de sessão aberta acima, mas ESTE navegador tinha guardado
+// session_id/token_sessao de uma sessão que não existe mais aberta — quem
+// estava de fato usando o cardápio encerrou a conta. Despedida, sem botão:
+// travarTela já limpa o storage (salvarSessao(null, null)), então um
+// re-scan do QR físico cai em mostrarBoasVindas na próxima checagem, não
+// de novo aqui.
+function mostrarContaFechada() {
   sessaoPendente = null;
   travarTela(
     'Conta encerrada',
-    `Não há pedido em aberto na Mesa ${mesaAtualValor()} no momento. Se você acabou de sentar, toque abaixo para começar um pedido novo.`,
-    ['iniciar']
+    'Obrigado pela visita! 🧡 Foi um prazer ter você no AOOBA! BAR.',
+    []
   );
+}
+
+// Decide entre as duas acima quando sessao_atual não acha sessão aberta (ou
+// a própria consulta falha): "guardada" é o que lerSessaoStorage() achou
+// pra ESTA mesa/aba antes de perguntar ao servidor — se havia algo, é
+// porque este navegador estava numa sessão que não existe mais; se não
+// havia nada, é mesa nova/cliente novo.
+function mostrarSemSessaoOuEncerrada(guardada) {
+  if (guardada) {
+    mostrarContaFechada();
+  } else {
+    mostrarBoasVindas();
+  }
 }
 
 // Mesa+token da mesa válidos e JÁ HÁ sessão aberta, mas este navegador não
@@ -407,7 +435,10 @@ function inscreverRealtimeSessao() {
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'sessoes', filter: `id=eq.${sessaoId}` },
       (payload) => {
-        if (payload.new.status === 'fechada') mostrarSemSessao();
+        // Esta aba estava de fato numa sessão (é por isso que inscreveu o
+        // canal, logo acima) e ela fechou agora — sempre CASO B, sem
+        // precisar checar o storage.
+        if (payload.new.status === 'fechada') mostrarContaFechada();
       }
     )
     .subscribe();
@@ -415,8 +446,9 @@ function inscreverRealtimeSessao() {
 
 // Verdade vinda do servidor sobre a sessão aberta da mesa agora — SEMPRE
 // reconferida no carregamento da página (regra 1: a URL manda, o storage
-// nunca autoriza sozinho). Três desfechos:
-//   - nenhuma sessão aberta -> mostrarSemSessao ("Iniciar novo pedido");
+// nunca autoriza sozinho). Quatro desfechos:
+//   - nenhuma sessão aberta E nada guardado -> mostrarBoasVindas ("Iniciar pedido");
+//   - nenhuma sessão aberta MAS havia sessão guardada -> mostrarContaFechada;
 //   - sessão aberta E este navegador já tinha guardado exatamente ela (mesmo
 //     sessao_id, mesmo token_sessao) -> entra direto, sem reperguntar;
 //   - sessão aberta mas SEM esse token guardado -> mostrarConfirmarEntrada,
@@ -425,9 +457,11 @@ async function atualizarEstadoSessao() {
   const mesaValor = mesaAtualValor();
   if (!mesaValor) return;
 
-  // Candidata de uma visita anterior a ESTA mesma mesa/aba — só serve de
-  // comparação abaixo, nunca é adotada antes de bater com o que o servidor
-  // confirma estar aberto agora.
+  // Candidata de uma visita anterior a ESTA mesma mesa/aba — serve tanto de
+  // comparação abaixo (é a mesma sessão que o servidor diz estar aberta?)
+  // quanto pra decidir, se não houver nenhuma aberta, entre boas-vindas
+  // (nada guardado) e conta encerrada (havia algo guardado que não vale
+  // mais) — ver mostrarSemSessaoOuEncerrada.
   const guardada = lerSessaoStorage();
 
   try {
@@ -435,7 +469,7 @@ async function atualizarEstadoSessao() {
     if (error) throw error;
 
     if (!data) {
-      mostrarSemSessao();
+      mostrarSemSessaoOuEncerrada(guardada);
       return;
     }
 
@@ -453,13 +487,14 @@ async function atualizarEstadoSessao() {
     console.error('Erro ao consultar sessão atual:', erro);
     // Sem resposta do servidor não dá pra confirmar nada — por segurança,
     // trava em vez de liberar o cardápio otimisticamente (regra 1). O botão
-    // "Iniciar novo pedido" também serve pra tentar de novo nesse caso.
-    mostrarSemSessao();
+    // de "Iniciar pedido" (quando aparece) também serve pra tentar de novo
+    // nesse caso.
+    mostrarSemSessaoOuEncerrada(guardada);
   }
 }
 
 // Único caminho de CRIAÇÃO de sessão pro cliente — só sob o toque explícito
-// neste botão (ver mostrarSemSessao), nunca automático.
+// neste botão (ver mostrarBoasVindas), nunca automático.
 async function abrirNovoPedido() {
   const mesaValor = mesaAtualValor();
   if (!mesaValor) return;
@@ -805,10 +840,10 @@ async function fazerPedido() {
     console.error('Erro ao enviar pedido:', erro);
 
     if (ehErroSessaoEncerrada(erro)) {
-      // Trava a tela em "Iniciar novo pedido" (ver mostrarSemSessao, na
-      // seção "BLOQUEIO DE ACESSO + TOKEN DE SESSÃO"). O carrinho fica como
-      // está; só um toque explícito nesse botão libera o cardápio de novo.
-      mostrarSemSessao();
+      // Esta aba estava numa sessão que acabou de encerrar (ver
+      // mostrarContaFechada). O carrinho fica como está; só um re-scan do
+      // QR libera o cardápio de novo.
+      mostrarContaFechada();
       return;
     }
 
@@ -1028,7 +1063,7 @@ async function abrirModalFecharConta(mesa) {
 
     if (ehErroSessaoEncerrada(erro)) {
       fecharModalFecharConta();
-      mostrarSemSessao();
+      mostrarContaFechada();
       return;
     }
 
@@ -1119,7 +1154,7 @@ async function confirmarFecharConta() {
 
     if (ehErroSessaoEncerrada(erro)) {
       fecharModalFecharConta();
-      mostrarSemSessao();
+      mostrarContaFechada();
       return;
     }
 

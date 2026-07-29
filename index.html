@@ -273,22 +273,27 @@
     </div>
   </div>
 
-  <!-- ===== MODAL: ACESSO BLOQUEADO / SEM SESSÃO ABERTA / CONFIRMAR ENTRADA ===== -->
-  <!-- Três estados diferentes com o mesmo visual (ver js/script.js):
+  <!-- ===== MODAL: ACESSO BLOQUEADO / BOAS-VINDAS / CONTA ENCERRADA / CONFIRMAR ENTRADA ===== -->
+  <!-- Quatro estados diferentes com o mesmo visual (ver js/script.js):
        1) ACESSO BLOQUEADO: a página nunca teve mesa+token da mesa válidos na
           URL (visita sem QR/link direto, só ?mesa= digitado), OU a pessoa
-          cancelou a confirmação de entrada (estado 3). Sem botão — a única
+          cancelou a confirmação de entrada (estado 4). Sem botão — a única
           saída é re-escanear o QR físico da mesa.
-       2) SEM SESSÃO ABERTA: mesa+token da mesa válidos, mas não há sessão
-          aberta pra essa mesa agora (conta acabou de ser encerrada, ou é a
-          primeira vez que alguém senta nela). Mostra "Iniciar novo pedido",
-          que abre uma sessão nova — com um token_sessao novo — só no toque.
-       3) CONFIRMAR ENTRADA: já existe sessão aberta pra essa mesa, mas este
+       2) BOAS-VINDAS: mesa+token da mesa válidos, sem sessão aberta agora, e
+          ESTE navegador nunca tinha guardado nenhuma sessão dela (cliente
+          novo/mesa livre). Mostra "Iniciar pedido", que abre uma sessão nova
+          — com um token_sessao novo — só no toque.
+       3) CONTA ENCERRADA: mesma falta de sessão aberta acima, mas ESTE
+          navegador TINHA guardado session_id/token_sessao de uma sessão que
+          não existe mais aberta — quem estava usando o cardápio de fato
+          encerrou a conta. Mensagem de despedida, sem botão; um re-scan do
+          QR físico cai de novo em BOAS-VINDAS (o storage já foi limpo).
+       4) CONFIRMAR ENTRADA: já existe sessão aberta pra essa mesa, mas este
           navegador não tem o token_sessao dela (celular novo entrando na
           mesma mesa, ou aba antiga sem nada guardado). Mostra "Cancelar" e
           "Entrar na conta" — só o toque em "Entrar" adota o token vigente e
           libera o cardápio.
-       Nenhum desses três acontece sozinho no reload nem por trás de um
+       Nenhum desses quatro acontece sozinho no reload nem por trás de um
        evento em tempo real — sempre sob toque explícito (ver
        supabase/017_token_sessao.sql). -->
   <div class="modal-overlay" id="contaEncerradaOverlay"></div>
@@ -300,7 +305,7 @@
     <div class="modal-panel__acoes" id="contaEncerradaAcoes" style="display: none;">
       <button type="button" class="btn btn--secondary" id="cancelarEntradaBtn" style="display: none;">Cancelar</button>
       <button type="button" class="btn btn--primary" id="entrarSessaoBtn" style="display: none;">Entrar na conta</button>
-      <button type="button" class="btn btn--primary" id="iniciarPedidoBtn" style="display: none;">Iniciar novo pedido</button>
+      <button type="button" class="btn btn--primary" id="iniciarPedidoBtn" style="display: none;">Iniciar pedido</button>
     </div>
   </div>
 
