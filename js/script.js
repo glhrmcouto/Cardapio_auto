@@ -346,14 +346,29 @@ function mostrarAcessoBloqueado() {
   );
 }
 
-// Mesa+token da mesa válidos, mas sem sessão aberta pra essa mesa AGORA —
-// cobre tanto "a conta foi encerrada enquanto eu olhava o cardápio" (evento
-// em tempo real, ver inscreverRealtimeSessao) quanto "F5/nova visita numa
-// mesa sem ninguém sentado". É a tela que aparece de fato logo depois de
-// "Fechar a conta toda", por isso a mensagem de despedida. Sem botão, a
-// pedido explícito — abrir_sessao (único caminho pra reabrir a mesa, ver
-// supabase/017_token_sessao.sql) não é mais chamado por ninguém depois disso.
+// Mesa+token da mesa válidos, mas sem sessão aberta pra essa mesa AGORA — a
+// checagem de rotina ao carregar a página (primeira visita à mesa, F5 muito
+// depois de qualquer fechamento, ou erro de rede na consulta). Mostra
+// "Iniciar novo pedido": só o toque nele (ver abrirNovoPedido) chama
+// abrir_sessao e libera o cardápio — é o único caminho do cliente pra abrir
+// sessão, então essa tela PRECISA manter o botão (re-escanear o QR cai
+// exatamente aqui de novo).
 function mostrarSemSessao() {
+  sessaoPendente = null;
+  travarTela(
+    'Conta encerrada',
+    `Não há pedido em aberto na Mesa ${mesaAtualValor()} no momento. Se você acabou de sentar, toque abaixo para começar um pedido novo.`,
+    ['iniciar']
+  );
+}
+
+// A conta REALMENTE acabou de fechar enquanto esta aba estava em uso — evento
+// em tempo real (ver inscreverRealtimeSessao) ou uma tentativa de pedir/ver
+// conta/fechar recusada com SESSAO_ENCERRADA. Mensagem de despedida, sem
+// botão: é o bloqueio que evita continuar pedindo numa sessão já encerrada
+// (o furo do F5 antigo). Um re-scan do QR físico da mesa recai em
+// mostrarSemSessao, que libera "Iniciar novo pedido" normalmente.
+function mostrarContaFechada() {
   sessaoPendente = null;
   travarTela(
     'Conta encerrada',
@@ -412,7 +427,7 @@ function inscreverRealtimeSessao() {
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'sessoes', filter: `id=eq.${sessaoId}` },
       (payload) => {
-        if (payload.new.status === 'fechada') mostrarSemSessao();
+        if (payload.new.status === 'fechada') mostrarContaFechada();
       }
     )
     .subscribe();
@@ -810,10 +825,9 @@ async function fazerPedido() {
     console.error('Erro ao enviar pedido:', erro);
 
     if (ehErroSessaoEncerrada(erro)) {
-      // Trava a tela em "Iniciar novo pedido" (ver mostrarSemSessao, na
-      // seção "BLOQUEIO DE ACESSO + TOKEN DE SESSÃO"). O carrinho fica como
-      // está; só um toque explícito nesse botão libera o cardápio de novo.
-      mostrarSemSessao();
+      // A conta já fechou nesse meio tempo (ver mostrarContaFechada). O
+      // carrinho fica como está; só um re-scan do QR libera o cardápio de novo.
+      mostrarContaFechada();
       return;
     }
 
@@ -1033,7 +1047,7 @@ async function abrirModalFecharConta(mesa) {
 
     if (ehErroSessaoEncerrada(erro)) {
       fecharModalFecharConta();
-      mostrarSemSessao();
+      mostrarContaFechada();
       return;
     }
 
@@ -1124,7 +1138,7 @@ async function confirmarFecharConta() {
 
     if (ehErroSessaoEncerrada(erro)) {
       fecharModalFecharConta();
-      mostrarSemSessao();
+      mostrarContaFechada();
       return;
     }
 
