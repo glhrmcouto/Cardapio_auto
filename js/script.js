@@ -260,10 +260,11 @@ function mesaAtualValor() {
   return mesaDaUrl || mesaInput.value.trim();
 }
 
-// Lê o session_id salvo de uma visita anterior a esta mesma mesa — só serve
-// de ponto de partida otimista pra sobreviver a um reload sem internet no
-// instante exato (ver atualizarSessaoAtual); sessao_atual() no banco sempre
-// tem a palavra final.
+// Lê o session_id salvo de uma visita anterior a esta mesma mesa. IMPORTANTE:
+// isso NUNCA autoriza nada sozinho — é usado só como valor de COMPARAÇÃO em
+// atualizarSessaoAtual, pra detectar "essa sessão que eu tinha guardada
+// ainda é a mesma que o servidor diz estar aberta?". sessaoId (a variável
+// que de fato viaja nos pedidos) só é setado depois dessa validação.
 function lerSessaoStorage() {
   const mesaGuardada = sessionStorage.getItem(SESSAO_MESA_KEY);
   const idGuardado = sessionStorage.getItem(SESSAO_ID_KEY);
@@ -271,8 +272,9 @@ function lerSessaoStorage() {
 }
 
 // Atualiza sessaoId (memória + sessionStorage) e reassina a trava em tempo
-// real pra essa sessão nova — chamada tanto pela consulta inicial quanto
-// pelo session_id que volta em cada pedido/fechamento bem-sucedido.
+// real pra essa sessão nova — chamada tanto pela consulta inicial (depois de
+// validada, ver atualizarSessaoAtual) quanto pelo session_id que volta em
+// cada pedido/fechamento bem-sucedido.
 function salvarSessao(id) {
   sessaoId = id;
   if (id) {
@@ -285,24 +287,45 @@ function salvarSessao(id) {
   inscreverRealtimeSessao();
 }
 
-// Verdade vinda do servidor sobre qual é a sessão aberta da mesa agora.
-// Chamada só uma vez, ao carregar a página (com acesso válido) — não existe
-// mais um jeito de chamar isso de novo depois de bloqueado (ver comentário
-// no topo desta seção).
+// Verdade vinda do servidor sobre qual é a sessão aberta da mesa agora —
+// SEMPRE reconferida no carregamento da página; o sessionStorage nunca
+// autoriza sozinho (regra 1: a URL manda, o storage nunca). Corrige o furo
+// em que um F5 depois de "Conta encerrada" reaproveitava o session_id
+// antigo do storage sem re-checar nada: antes, sessaoId era preenchido
+// direto de lerSessaoStorage() e essa função só sobrescrevia silenciosamente
+// com o que o servidor respondesse, sem nunca travar a tela nesse caminho.
 async function atualizarSessaoAtual() {
   const mesaValor = mesaAtualValor();
   if (!mesaValor) return;
 
+  // Candidato guardado de uma visita anterior a ESTA mesma mesa/aba — pode
+  // já estar morto (sessão encerrada enquanto a aba estava fechada ou em
+  // segundo plano, sem receber o Realtime). Só serve de comparação abaixo,
+  // nunca é atribuído a sessaoId antes de validar.
+  const sessaoAnterior = lerSessaoStorage();
+
   try {
     const { data, error } = await supabase.rpc('sessao_atual', { p_mesa: Number(mesaValor), p_token: tokenMesa });
     if (error) throw error;
+
+    if (sessaoAnterior && sessaoAnterior !== data) {
+      // Tínhamos uma sessão guardada e ela NÃO é (mais) a sessão aberta
+      // atual da mesa, segundo o servidor — foi encerrada nesse meio-tempo
+      // (ou uma sessão diferente abriu depois). Nunca reaproveita
+      // silenciosamente: trava a tela (mostrarContaEncerrada já limpa o
+      // storage) em vez de liberar o cardápio como se nada tivesse acontecido.
+      mostrarContaEncerrada();
+      return;
+    }
+
     salvarSessao(data);
   } catch (erro) {
     console.error('Erro ao consultar sessão atual:', erro);
-    // Mantém o que já estava em memória (sessionStorage de uma visita
-    // anterior, se houver) — melhor seguir com um valor talvez desatualizado
-    // do que travar o carregamento da página por causa disso. A validação
-    // de verdade acontece no servidor a cada pedido de qualquer forma.
+    // Sem resposta do servidor não dá pra confirmar NEM invalidar a sessão
+    // guardada — por segurança, não reaproveita ela otimistamente (regra 1).
+    // sessaoId fica null; qualquer pedido/fechamento tentado nesse meio-tempo
+    // ainda é validado de novo no banco (criar_pedido etc. exigem o token e
+    // conferem a sessão de qualquer forma).
   }
 }
 
@@ -352,7 +375,9 @@ function inscreverRealtimeSessao() {
 }
 
 if (temAcessoValido) {
-  sessaoId = lerSessaoStorage();
+  // sessaoId começa null e só é preenchido depois de atualizarSessaoAtual
+  // validar (ou não) o que estiver no sessionStorage contra o servidor —
+  // nunca antes disso (regra 1: a URL manda, o storage nunca autoriza sozinho).
   atualizarSessaoAtual();
 } else {
   mostrarContaEncerrada();
