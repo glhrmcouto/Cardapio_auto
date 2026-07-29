@@ -152,7 +152,11 @@ async function carregarCardapio() {
 }
 
 cardapioTentarBtn.addEventListener('click', carregarCardapio);
-carregarCardapio();
+// NÃO chama carregarCardapio() aqui: ela só roda depois que a sessão é
+// confirmada (ver aposEntrarNaSessao, na seção "BLOQUEIO DE ACESSO + TOKEN
+// DE SESSÃO") — carregar o cardápio (e os botões "Adicionar") em paralelo
+// com a checagem de sessão criava uma janela em que o cardápio aparecia
+// pedível antes da trava aparecer, mesmo numa mesa sem sessão aberta.
 
 // ========================================
 // ANIMAÇÃO FADE-IN AO ROLAR (IntersectionObserver)
@@ -379,6 +383,7 @@ function mostrarContaFechada() {
 // porque este navegador estava numa sessão que não existe mais; se não
 // havia nada, é mesa nova/cliente novo.
 function mostrarSemSessaoOuEncerrada(guardada) {
+  console.log('[sessao] sem sessão aberta — guardada:', guardada, '-> mostrando', guardada ? 'CASO B (conta encerrada)' : 'CASO A (boas-vindas)');
   if (guardada) {
     mostrarContaFechada();
   } else {
@@ -411,8 +416,12 @@ function destravarTela() {
 
 // Roda toda vez que a tela destrava (sessão nova, reaproveitada ou
 // confirmada) — só falta pedir o nome se esta aba ainda não tiver um guardado.
+// É AQUI que o cardápio é carregado pela primeira vez (nunca antes,
+// nunca em paralelo com a checagem de sessão — ver comentário acima de
+// cardapioTentarBtn): só depois de confirmado que esta aba pode pedir.
 function aposEntrarNaSessao() {
   destravarTela();
+  carregarCardapio();
   if (!clienteNome) abrirModalNome();
 }
 
@@ -513,7 +522,7 @@ async function abrirNovoPedido() {
     mostrarToast(erro.message || 'Não foi possível iniciar o pedido agora. Verifique sua conexão e tente de novo.');
   } finally {
     iniciarPedidoBtn.disabled = false;
-    iniciarPedidoBtn.textContent = 'Iniciar novo pedido';
+    iniciarPedidoBtn.textContent = 'Iniciar pedido';
   }
 }
 
