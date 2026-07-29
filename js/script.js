@@ -216,6 +216,149 @@ if (mesaDaUrl) {
 }
 
 // ========================================
+// BLOQUEIO DE ACESSO + VÍNCULO DE SESSÃO
+// ========================================
+//
+// BLOQUEIO DE ACESSO (item 3): o número da mesa é adivinhável (é só um
+// inteiro pequeno na URL); o token não (ver mesas.token em
+// supabase/005_seguranca.sql). Por isso a ÚNICA forma de liberar o cardápio
+// pra pedido é abrir o link do QR físico da mesa, que traz os dois:
+// ?mesa=N&t=TOKEN. Sem os dois, nem tenta consultar sessão nenhuma — trava
+// direto na tela "Conta encerrada" (reaproveitada aqui como "acesso
+// bloqueado"), pedindo pra escanear o QR. A validação de verdade continua
+// sendo a do servidor (criar_pedido/pedir_fechamento/conta_da_mesa exigem e
+// conferem o token — ver 005_seguranca.sql e 014_sessao_vinculada.sql);
+// isso aqui só evita mostrar uma UI de pedido que o banco ia recusar de
+// qualquer jeito.
+const temAcessoValido = Boolean(mesaDaUrl && tokenMesa);
+
+// VÍNCULO DE SESSÃO (corrige o bug de "mesa que vira" — ver
+// supabase/014_sessao_vinculada.sql): sem isso, criar_pedido/
+// pedir_fechamento/conta_da_mesa só sabiam "qual é a sessão aberta da mesa
+// AGORA" (pelo número da mesa) — não "em qual sessão ESTE celular estava".
+// Se o garçom fechasse a conta (encerrar_sessao, manual ou automático — ver
+// 015_encerramento_automatico.sql) e um cliente novo sentasse na mesma
+// mesa, um celular antigo que ainda estivesse com o cardápio aberto
+// conseguia mandar pedido, e ele caía direto na comanda do cliente novo.
+//
+// Todo pedido/fechamento carrega o session_id que o navegador tem guardado
+// (sessaoId). O servidor recusa com 'SESSAO_ENCERRADA' se esse session_id
+// não for mais o da sessão aberta da mesa — nesse caso a UI trava
+// PERMANENTEMENTE no overlay "Conta encerrada": diferente da versão
+// anterior desta tela, não existe mais um botão que reabre/reaproveita
+// sessão pela própria página — a única saída é re-escanear o QR físico
+// (mesmo raciocínio do bloqueio de acesso acima: garante que só quem está
+// fisicamente na mesa consegue voltar a pedir).
+
+const SESSAO_ID_KEY = 'aooba_sessao_id';
+const SESSAO_MESA_KEY = 'aooba_sessao_mesa';
+
+let sessaoId = null;
+let canalSessao = null;
+
+function mesaAtualValor() {
+  return mesaDaUrl || mesaInput.value.trim();
+}
+
+// Lê o session_id salvo de uma visita anterior a esta mesma mesa — só serve
+// de ponto de partida otimista pra sobreviver a um reload sem internet no
+// instante exato (ver atualizarSessaoAtual); sessao_atual() no banco sempre
+// tem a palavra final.
+function lerSessaoStorage() {
+  const mesaGuardada = sessionStorage.getItem(SESSAO_MESA_KEY);
+  const idGuardado = sessionStorage.getItem(SESSAO_ID_KEY);
+  return mesaGuardada && idGuardado && mesaGuardada === mesaAtualValor() ? idGuardado : null;
+}
+
+// Atualiza sessaoId (memória + sessionStorage) e reassina a trava em tempo
+// real pra essa sessão nova — chamada tanto pela consulta inicial quanto
+// pelo session_id que volta em cada pedido/fechamento bem-sucedido.
+function salvarSessao(id) {
+  sessaoId = id;
+  if (id) {
+    sessionStorage.setItem(SESSAO_ID_KEY, id);
+    sessionStorage.setItem(SESSAO_MESA_KEY, mesaAtualValor());
+  } else {
+    sessionStorage.removeItem(SESSAO_ID_KEY);
+    sessionStorage.removeItem(SESSAO_MESA_KEY);
+  }
+  inscreverRealtimeSessao();
+}
+
+// Verdade vinda do servidor sobre qual é a sessão aberta da mesa agora.
+// Chamada só uma vez, ao carregar a página (com acesso válido) — não existe
+// mais um jeito de chamar isso de novo depois de bloqueado (ver comentário
+// no topo desta seção).
+async function atualizarSessaoAtual() {
+  const mesaValor = mesaAtualValor();
+  if (!mesaValor) return;
+
+  try {
+    const { data, error } = await supabase.rpc('sessao_atual', { p_mesa: Number(mesaValor), p_token: tokenMesa });
+    if (error) throw error;
+    salvarSessao(data);
+  } catch (erro) {
+    console.error('Erro ao consultar sessão atual:', erro);
+    // Mantém o que já estava em memória (sessionStorage de uma visita
+    // anterior, se houver) — melhor seguir com um valor talvez desatualizado
+    // do que travar o carregamento da página por causa disso. A validação
+    // de verdade acontece no servidor a cada pedido de qualquer forma.
+  }
+}
+
+// Distingue a recusa "SESSAO_ENCERRADA" (ver supabase/014_sessao_vinculada.sql)
+// de qualquer outro erro de RPC — usa error.details (onde o Postgres/PostgREST
+// colocam o DETAIL de uma exceção), nunca o texto da mensagem.
+function ehErroSessaoEncerrada(erro) {
+  return Boolean(erro) && erro.details === 'SESSAO_ENCERRADA';
+}
+
+const contaEncerradaOverlay = document.getElementById('contaEncerradaOverlay');
+const contaEncerradaModal = document.getElementById('contaEncerradaModal');
+
+// Trava permanentemente a tela (sem botão de saída — ver comentário no topo
+// desta seção) e limpa qualquer session_id antigo do sessionStorage, pra
+// não restar estado que permita burlar o bloqueio numa próxima visita a
+// essa mesma aba/mesa.
+function mostrarContaEncerrada() {
+  salvarSessao(null);
+  contaEncerradaOverlay.classList.add('is-open');
+  contaEncerradaModal.classList.add('is-open');
+}
+
+// Trava em tempo real — só CONFORTO (UX): reage na hora se a sessão fechar
+// enquanto a página está aberta, sem esperar a pessoa tentar pedir de novo.
+// A defesa de verdade é a validação de session_id dentro de
+// criar_pedido/pedir_fechamento/conta_da_mesa no banco (ver
+// supabase/014_sessao_vinculada.sql) — o Realtime pode atrasar ou a conexão
+// pode cair sem a gente perceber, então NUNCA confie só nisso aqui.
+function inscreverRealtimeSessao() {
+  if (canalSessao) {
+    supabase.removeChannel(canalSessao);
+    canalSessao = null;
+  }
+  if (!sessaoId) return;
+
+  canalSessao = supabase
+    .channel(`sessao-cliente-${sessaoId}`)
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'sessoes', filter: `id=eq.${sessaoId}` },
+      (payload) => {
+        if (payload.new.status === 'fechada') mostrarContaEncerrada();
+      }
+    )
+    .subscribe();
+}
+
+if (temAcessoValido) {
+  sessaoId = lerSessaoStorage();
+  atualizarSessaoAtual();
+} else {
+  mostrarContaEncerrada();
+}
+
+// ========================================
 // IDENTIFICAÇÃO DA PESSOA (nome/apelido, sem login/cadastro)
 // ========================================
 //
@@ -294,142 +437,10 @@ nomeInput.addEventListener('keydown', (event) => {
 trocarNomeBtn.addEventListener('click', abrirModalNome);
 
 atualizarLabelNome();
-if (!clienteNome) abrirModalNome();
-
-// ========================================
-// VÍNCULO DE SESSÃO (corrige o bug de "mesa que vira")
-// ========================================
-//
-// Problema: sem isso, criar_pedido/pedir_fechamento/conta_da_mesa só sabiam
-// "qual é a sessão aberta da mesa AGORA" (pelo número da mesa) — não "em qual
-// sessão ESTE celular estava". Se o garçom fechasse a conta (encerrar_sessao)
-// e um cliente novo sentasse na mesma mesa, um celular antigo que ainda
-// estivesse com o cardápio aberto (do grupo que já saiu) conseguia mandar
-// pedido, e ele caía direto na comanda do cliente novo.
-//
-// A partir daqui, todo pedido/fechamento carrega o session_id que o
-// navegador tem guardado (sessaoId). O servidor (ver
-// supabase/014_sessao_vinculada.sql) recusa com 'SESSAO_ENCERRADA' se esse
-// session_id não for mais o da sessão aberta da mesa — nesse caso a UI
-// trava com o overlay "Conta encerrada" (mostrarContaEncerrada) até a
-// pessoa tocar em "Iniciar novo pedido".
-
-const SESSAO_ID_KEY = 'aooba_sessao_id';
-const SESSAO_MESA_KEY = 'aooba_sessao_mesa';
-
-let sessaoId = null;
-let canalSessao = null;
-
-function mesaAtualValor() {
-  return mesaDaUrl || mesaInput.value.trim();
-}
-
-// Lê o session_id salvo de uma visita anterior a esta mesma mesa — só serve
-// de ponto de partida otimista pra sobreviver a um reload sem internet no
-// instante exato (ver atualizarSessaoAtual); sessao_atual() no banco sempre
-// tem a palavra final.
-function lerSessaoStorage() {
-  const mesaGuardada = sessionStorage.getItem(SESSAO_MESA_KEY);
-  const idGuardado = sessionStorage.getItem(SESSAO_ID_KEY);
-  return mesaGuardada && idGuardado && mesaGuardada === mesaAtualValor() ? idGuardado : null;
-}
-
-// Atualiza sessaoId (memória + sessionStorage) e reassina a trava em tempo
-// real pra essa sessão nova — chamada tanto pela consulta inicial quanto
-// pelo session_id que volta em cada pedido/fechamento bem-sucedido.
-function salvarSessao(id) {
-  sessaoId = id;
-  if (id) {
-    sessionStorage.setItem(SESSAO_ID_KEY, id);
-    sessionStorage.setItem(SESSAO_MESA_KEY, mesaAtualValor());
-  } else {
-    sessionStorage.removeItem(SESSAO_ID_KEY);
-    sessionStorage.removeItem(SESSAO_MESA_KEY);
-  }
-  inscreverRealtimeSessao();
-}
-
-// Verdade vinda do servidor sobre qual é a sessão aberta da mesa agora.
-// Chamada ao carregar a página e de novo depois de "Iniciar novo pedido".
-async function atualizarSessaoAtual() {
-  const mesaValor = mesaAtualValor();
-  if (!mesaValor) return;
-
-  try {
-    const { data, error } = await supabase.rpc('sessao_atual', { p_mesa: Number(mesaValor), p_token: tokenMesa });
-    if (error) throw error;
-    salvarSessao(data);
-  } catch (erro) {
-    console.error('Erro ao consultar sessão atual:', erro);
-    // Mantém o que já estava em memória (sessionStorage de uma visita
-    // anterior, se houver) — melhor seguir com um valor talvez desatualizado
-    // do que travar o carregamento da página por causa disso. A validação
-    // de verdade acontece no servidor a cada pedido de qualquer forma.
-  }
-}
-
-// Distingue a recusa "SESSAO_ENCERRADA" (ver supabase/014_sessao_vinculada.sql)
-// de qualquer outro erro de RPC — usa error.details (onde o Postgres/PostgREST
-// colocam o DETAIL de uma exceção), nunca o texto da mensagem.
-function ehErroSessaoEncerrada(erro) {
-  return Boolean(erro) && erro.details === 'SESSAO_ENCERRADA';
-}
-
-const contaEncerradaOverlay = document.getElementById('contaEncerradaOverlay');
-const contaEncerradaModal = document.getElementById('contaEncerradaModal');
-const contaEncerradaIniciarBtn = document.getElementById('contaEncerradaIniciarBtn');
-
-function mostrarContaEncerrada() {
-  contaEncerradaOverlay.classList.add('is-open');
-  contaEncerradaModal.classList.add('is-open');
-}
-
-function esconderContaEncerrada() {
-  contaEncerradaOverlay.classList.remove('is-open');
-  contaEncerradaModal.classList.remove('is-open');
-}
-
-// "Iniciar novo pedido": descarta o carrinho antigo (era da conta que já
-// fechou), limpa o session_id guardado e consulta de novo qual é a sessão
-// vigente da mesa agora — pode já existir (alguém pediu antes desta pessoa)
-// ou ser aberta na hora pelo primeiro pedido seguinte.
-async function iniciarNovoPedido() {
-  carrinho = [];
-  renderizarCarrinho();
-  esconderContaEncerrada();
-  salvarSessao(null);
-  await atualizarSessaoAtual();
-}
-
-contaEncerradaIniciarBtn.addEventListener('click', iniciarNovoPedido);
-
-// Trava em tempo real — só CONFORTO (UX): reage na hora se a sessão fechar
-// enquanto a página está aberta, sem esperar a pessoa tentar pedir de novo.
-// A defesa de verdade é a validação de session_id dentro de
-// criar_pedido/pedir_fechamento/conta_da_mesa no banco (ver
-// supabase/014_sessao_vinculada.sql) — o Realtime pode atrasar ou a conexão
-// pode cair sem a gente perceber, então NUNCA confie só nisso aqui.
-function inscreverRealtimeSessao() {
-  if (canalSessao) {
-    supabase.removeChannel(canalSessao);
-    canalSessao = null;
-  }
-  if (!sessaoId) return;
-
-  canalSessao = supabase
-    .channel(`sessao-cliente-${sessaoId}`)
-    .on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'sessoes', filter: `id=eq.${sessaoId}` },
-      (payload) => {
-        if (payload.new.status === 'fechada') mostrarContaEncerrada();
-      }
-    )
-    .subscribe();
-}
-
-sessaoId = lerSessaoStorage();
-atualizarSessaoAtual();
+// Sem acesso válido (ver temAcessoValido), a tela já está travada no
+// overlay "Conta encerrada" — não faz sentido empilhar o modal de nome por
+// cima dele.
+if (temAcessoValido && !clienteNome) abrirModalNome();
 
 const cartFab = document.getElementById('cartFab');
 const cartBadge = document.getElementById('cartBadge');
@@ -543,13 +554,39 @@ document.addEventListener('click', (event) => {
   adicionarAoCarrinho(Number(botao.dataset.produtoId), botao.dataset.nome, parseFloat(botao.dataset.preco), compartilhado);
 });
 
-// Mostra uma mensagem rápida no rodapé da tela
+// Mostra uma mensagem rápida no rodapé da tela — usada pros avisos em geral
+// (erros, "fechar minha parte", etc.). A confirmação de "pedido enviado" NÃO
+// usa mais isso: ver mostrarPedidoConfirmado, logo abaixo.
 function mostrarToast(mensagem) {
   toastEl.textContent = mensagem;
   toastEl.classList.add('show');
   clearTimeout(mostrarToast._timer);
   mostrarToast._timer = setTimeout(() => toastEl.classList.remove('show'), 3500);
 }
+
+// ========================================
+// CONFIRMAÇÃO CENTRAL DE PEDIDO ENVIADO
+// ========================================
+//
+// Diferente do toast de rodapé (mostrarToast, acima): "Pedido enviado" pedia
+// destaque forte, então sobe centralizada, com fundo escurecido atrás — ver
+// .pedido-confirmado-overlay em css/style.css. Some sozinha depois de
+// alguns segundos ou ao toque em qualquer lugar do overlay.
+
+const pedidoConfirmadoOverlay = document.getElementById('pedidoConfirmadoOverlay');
+
+function esconderPedidoConfirmado() {
+  pedidoConfirmadoOverlay.classList.remove('show');
+  clearTimeout(mostrarPedidoConfirmado._timer);
+}
+
+function mostrarPedidoConfirmado() {
+  pedidoConfirmadoOverlay.classList.add('show');
+  clearTimeout(mostrarPedidoConfirmado._timer);
+  mostrarPedidoConfirmado._timer = setTimeout(esconderPedidoConfirmado, 2800);
+}
+
+pedidoConfirmadoOverlay.addEventListener('click', esconderPedidoConfirmado);
 
 // Valida a mesa, chama a RPC criar_pedido (o preço real é recalculado no banco) e,
 // se der certo, limpa o carrinho. Em erro de rede/servidor, avisa e mantém o carrinho
@@ -605,17 +642,18 @@ async function fazerPedido() {
     // visita passam a usar esse mesmo id (ver supabase/014_sessao_vinculada.sql).
     salvarSessao(data.sessao_id);
 
-    mostrarToast('Pedido enviado! O garçom já foi avisado.');
+    fecharCarrinho();
+    mostrarPedidoConfirmado();
     carrinho = [];
     renderizarCarrinho();
-    fecharCarrinho();
   } catch (erro) {
     console.error('Erro ao enviar pedido:', erro);
 
     if (ehErroSessaoEncerrada(erro)) {
-      // Não reenvia sozinho em outra sessão — a pessoa decide, tocando em
-      // "Iniciar novo pedido" (ver contaEncerradaIniciarBtn). O carrinho fica
-      // como está até esse ponto; só é descartado ali.
+      // Trava a tela de vez — não existe mais reenvio nem reabertura de
+      // sessão pela própria página (ver comentário no topo da seção
+      // "BLOQUEIO DE ACESSO + VÍNCULO DE SESSÃO"). O carrinho fica como
+      // está; a única saída daqui é re-escanear o QR físico da mesa.
       mostrarContaEncerrada();
       return;
     }

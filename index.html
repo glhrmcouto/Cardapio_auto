@@ -273,22 +273,34 @@
     </div>
   </div>
 
-  <!-- ===== MODAL: CONTA ENCERRADA (mesa virou de cliente enquanto a página ficou aberta) ===== -->
-  <!-- Sem botão de fechar/cancelar de propósito, igual o nomeModal obrigatório:
-       a pessoa precisa tocar em "Iniciar novo pedido" pra liberar a tela de novo
-       (ver supabase/014_sessao_vinculada.sql e js/script.js, mostrarContaEncerrada). -->
+  <!-- ===== MODAL: CONTA ENCERRADA / ACESSO BLOQUEADO ===== -->
+  <!-- Mesma tela pros dois casos (ver js/script.js): a sessão virou 'fechada'
+       enquanto a página estava aberta, OU a página nunca teve token válido na
+       URL pra começo de conversa (visita sem QR/link direto com só ?mesa=).
+       Sem botão nenhum de propósito — não existe mais um caminho que
+       reaproveita/reabre sessão pela própria página; a única saída é
+       re-escanear o QR físico da mesa (ele carrega ?mesa=N&t=TOKEN, e só o
+       token garante que quem está pedindo está fisicamente na mesa — ver
+       supabase/014_sessao_vinculada.sql). -->
   <div class="modal-overlay" id="contaEncerradaOverlay"></div>
   <div class="modal-panel modal-panel--nome" id="contaEncerradaModal" role="dialog" aria-modal="true" aria-labelledby="contaEncerradaTitulo">
     <div class="modal-panel__header">
       <span class="modal-panel__title" id="contaEncerradaTitulo">Conta encerrada</span>
     </div>
-    <p class="nome-modal__texto">Esta conta foi encerrada. Se você acabou de sentar, toque no botão abaixo pra começar um novo pedido.</p>
-    <div class="modal-panel__acoes">
-      <button type="button" class="btn btn--primary" id="contaEncerradaIniciarBtn">Iniciar novo pedido</button>
+    <p class="nome-modal__texto">Se você acabou de sentar, escaneie o QR code da mesa novamente para começar um novo pedido.</p>
+  </div>
+
+  <!-- ===== CONFIRMAÇÃO CENTRAL DE PEDIDO ENVIADO ===== -->
+  <!-- Some sozinha depois de alguns segundos ou ao toque em qualquer lugar do
+       overlay — ver js/script.js, mostrarPedidoConfirmado/esconderPedidoConfirmado. -->
+  <div class="pedido-confirmado-overlay" id="pedidoConfirmadoOverlay">
+    <div class="pedido-confirmado-card">
+      <span class="pedido-confirmado-icone" aria-hidden="true">✓</span>
+      <p class="pedido-confirmado-texto">Pedido enviado! O garçom já foi avisado.</p>
     </div>
   </div>
 
-  <!-- Toast de confirmação -->
+  <!-- Toast de confirmação (avisos gerais, rodapé) -->
   <div class="toast" id="toast"></div>
 
   <script type="module" src="js/script.js"></script>
