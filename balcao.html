@@ -92,6 +92,25 @@
       <div class="modal-panel__itens" id="historicoLista"></div>
     </div>
 
+    <!-- ===== MODAL: CONFIRMAR SENHA (ações sensíveis: remover item, fechar mesa) =====
+         Reautentica com a MESMA conta já logada (supabase.auth.signInWithPassword) só
+         pra confirmar que quem está com a mão no balcão agora sabe a senha — não troca
+         de conta nem cria conta nova. Ver pedirConfirmacaoSenha em js/balcao.js. -->
+    <div class="modal-overlay" id="confirmarSenhaOverlay"></div>
+    <div class="modal-panel modal-panel--nome" id="confirmarSenhaModal" role="dialog" aria-modal="true" aria-labelledby="confirmarSenhaTitulo">
+      <div class="modal-panel__header">
+        <span class="modal-panel__title" id="confirmarSenhaTitulo">Confirme a senha</span>
+      </div>
+      <p class="nome-modal__texto" id="confirmarSenhaTexto">Essa ação precisa da senha do balcão pra continuar.</p>
+      <label for="confirmarSenhaInput" class="nome-modal__label">Senha</label>
+      <input type="password" id="confirmarSenhaInput" class="nome-modal__input" autocomplete="current-password">
+      <span class="nome-modal__aviso" id="confirmarSenhaAviso">Senha incorreta.</span>
+      <div class="modal-panel__acoes">
+        <button type="button" class="btn btn--secondary" id="confirmarSenhaCancelar">Cancelar</button>
+        <button type="button" class="btn btn--primary" id="confirmarSenhaOk">Confirmar</button>
+      </div>
+    </div>
+
   </div>
 
   <!-- Toast de aviso discreto (ex.: "Mesa X quitada e encerrada automaticamente" —

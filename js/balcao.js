@@ -48,6 +48,13 @@ const historicoFiltroLimpar = document.getElementById('historicoFiltroLimpar');
 
 const toastEl = document.getElementById('toast');
 
+const confirmarSenhaOverlay = document.getElementById('confirmarSenhaOverlay');
+const confirmarSenhaModal = document.getElementById('confirmarSenhaModal');
+const confirmarSenhaInput = document.getElementById('confirmarSenhaInput');
+const confirmarSenhaAviso = document.getElementById('confirmarSenhaAviso');
+const confirmarSenhaCancelar = document.getElementById('confirmarSenhaCancelar');
+const confirmarSenhaOk = document.getElementById('confirmarSenhaOk');
+
 // Aviso discreto no rodapé (mesmo padrão de js/script.js) — usado hoje só
 // pro encerramento automático de sessão (ver confirmarRecebimentoPagamento
 // e supabase/015_encerramento_automatico.sql).
@@ -159,6 +166,72 @@ if (sessaoInicial) {
 } else {
   mostrarTelaLogin();
 }
+
+// ========================================
+// CONFIRMAÇÃO DE SENHA (ações sensíveis: remover item, fechar mesa)
+// ========================================
+//
+// Reautentica com signInWithPassword usando o e-mail JÁ logado (supabase.auth.getUser) —
+// isso não troca de conta nem cria sessão nova de verdade, só confirma que quem está
+// com a mão no balcão agora sabe a senha antes de uma ação difícil de desfazer
+// (remover item de pedido, fechar mesa direto). Qualquer erro (senha errada, sem
+// conexão) recusa e mantém o modal aberto pra tentar de novo.
+
+let acaoPendenteSenha = null;
+
+function pedirConfirmacaoSenha(acao) {
+  acaoPendenteSenha = acao;
+  confirmarSenhaInput.value = '';
+  confirmarSenhaAviso.classList.remove('show');
+  confirmarSenhaOverlay.classList.add('is-open');
+  confirmarSenhaModal.classList.add('is-open');
+  confirmarSenhaInput.focus();
+}
+
+function fecharConfirmacaoSenha() {
+  acaoPendenteSenha = null;
+  confirmarSenhaOverlay.classList.remove('is-open');
+  confirmarSenhaModal.classList.remove('is-open');
+}
+
+async function confirmarSenha() {
+  const senha = confirmarSenhaInput.value;
+  const acao = acaoPendenteSenha;
+
+  if (!senha || !acao) return;
+
+  confirmarSenhaOk.disabled = true;
+  confirmarSenhaOk.textContent = 'Confirmando...';
+  confirmarSenhaAviso.classList.remove('show');
+
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase.auth.signInWithPassword({ email: user?.email, password: senha });
+
+  confirmarSenhaOk.disabled = false;
+  confirmarSenhaOk.textContent = 'Confirmar';
+
+  if (error) {
+    confirmarSenhaAviso.classList.add('show');
+    confirmarSenhaInput.focus();
+    confirmarSenhaInput.select();
+    return;
+  }
+
+  fecharConfirmacaoSenha();
+  await acao();
+}
+
+confirmarSenhaCancelar.addEventListener('click', fecharConfirmacaoSenha);
+confirmarSenhaOverlay.addEventListener('click', fecharConfirmacaoSenha);
+confirmarSenhaOk.addEventListener('click', confirmarSenha);
+confirmarSenhaInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') confirmarSenha();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && confirmarSenhaModal.classList.contains('is-open')) {
+    fecharConfirmacaoSenha();
+  }
+});
 
 // ========================================
 // INDICADOR DE CONEXÃO
@@ -283,7 +356,7 @@ if (ativarSomBtn) {
 async function carregarPedidosPendentes() {
   const { data, error } = await supabase
     .from('pedidos')
-    .select('id, mesa, total, status, criado_em, cliente_nome, itens:pedido_itens(nome:nome_snapshot, preco:preco_unitario, quantidade)')
+    .select('id, mesa, total, status, criado_em, cliente_nome, itens:pedido_itens(id, nome:nome_snapshot, preco:preco_unitario, quantidade)')
     .eq('tipo', 'pedido')
     .eq('status', 'pendente')
     .order('criado_em', { ascending: true });
@@ -416,7 +489,10 @@ function renderizarPedidos() {
         ${pedido.itens.map(item => `
           <li>
             <span>${item.quantidade}x ${item.nome}</span>
-            <span>${formatarPreco(item.preco * item.quantidade)}</span>
+            <span class="pedido-card__item-fim">
+              ${formatarPreco(item.preco * item.quantidade)}
+              <button type="button" class="pedido-card__item-remover" data-pedido-id="${pedido.id}" data-item-id="${item.id}" aria-label="Remover ${escaparTexto(item.nome)}" title="Remover item (pedido errado)">✕</button>
+            </span>
           </li>
         `).join('')}
       </ul>
@@ -424,6 +500,38 @@ function renderizarPedidos() {
       <button class="btn btn--primary pedido-card__entregar" data-id="${pedido.id}">Entregue</button>
     </div>
   `).join('');
+}
+
+// Remove um item de um pedido ainda pendente (ver remover_item_pedido em
+// supabase/018_remover_item_pedido.sql) — "pediu errado". Se era o último
+// item, o pedido inteiro some da fila (o banco já apaga a linha).
+async function removerItemPedido(pedidoId, itemId, botao) {
+  if (botao) botao.disabled = true;
+
+  const { error } = await supabase.rpc('remover_item_pedido', {
+    p_pedido_id: pedidoId,
+    p_item_id: Number(itemId),
+  });
+
+  if (error) {
+    console.error('Erro ao remover item do pedido:', error);
+    alert(error.message || 'Não foi possível remover o item agora. Verifique sua conexão e tente de novo.');
+    if (botao) botao.disabled = false;
+    return;
+  }
+
+  const pedido = pedidos.find(p => p.id === pedidoId);
+  if (pedido) {
+    pedido.itens = pedido.itens.filter(item => String(item.id) !== String(itemId));
+    if (pedido.itens.length === 0) {
+      pedidos = pedidos.filter(p => p.id !== pedidoId);
+    } else {
+      pedido.total = pedido.itens.reduce((soma, item) => soma + item.preco * item.quantidade, 0);
+    }
+  }
+
+  renderizarPedidos();
+  await renderizarMesasAtivas();
 }
 
 // Marca como entregue direto no Supabase; some da fila só depois de confirmar,
@@ -452,9 +560,17 @@ async function marcarComoEntregue(id) {
 }
 
 balcaoGrid.addEventListener('click', (event) => {
-  const botao = event.target.closest('.pedido-card__entregar');
-  if (!botao) return;
-  marcarComoEntregue(botao.dataset.id);
+  const botaoEntregar = event.target.closest('.pedido-card__entregar');
+  if (botaoEntregar) {
+    marcarComoEntregue(botaoEntregar.dataset.id);
+    return;
+  }
+
+  const botaoRemover = event.target.closest('.pedido-card__item-remover');
+  if (botaoRemover) {
+    const { pedidoId, itemId } = botaoRemover.dataset;
+    pedirConfirmacaoSenha(() => removerItemPedido(pedidoId, itemId, botaoRemover));
+  }
 });
 
 // ========================================
@@ -734,12 +850,42 @@ async function renderizarMesasAtivas() {
           `).join('')}
         </div>
       ` : ''}
+      <button type="button" class="btn btn--secondary mesa-ativa-card__fechar" data-mesa="${sessao.mesa}">Fechar mesa</button>
     </div>
   `;
   }));
 
   mesasAtivasGrid.innerHTML = cards.join('');
 }
+
+// Fecha a mesa direto (sem esperar o cliente pedir "Fechar a conta" pelo
+// cardápio) — ex.: cliente foi embora sem pedir fechamento. Reaproveita
+// tentarEncerrarSessao (mesmo aviso de saldo pendente/confirmação de forçar
+// que o fluxo de responder um pedido de fechamento já usa).
+async function fecharMesaDireto(mesa, botao) {
+  if (botao) botao.disabled = true;
+
+  const sucesso = await tentarEncerrarSessao(mesa);
+
+  if (!sucesso) {
+    if (botao) botao.disabled = false;
+    return;
+  }
+
+  pedidos = pedidos.filter(pedido => String(pedido.mesa) !== String(mesa));
+  fechamentos = fechamentos.filter(f => String(f.mesa) !== String(mesa));
+  mesasAtivas = mesasAtivas.filter(s => String(s.mesa) !== String(mesa));
+  renderizarPedidos();
+  await renderizarFechamentos();
+  await renderizarMesasAtivas();
+}
+
+mesasAtivasGrid.addEventListener('click', (event) => {
+  const botao = event.target.closest('.mesa-ativa-card__fechar');
+  if (!botao) return;
+  const mesa = botao.dataset.mesa;
+  pedirConfirmacaoSenha(() => fecharMesaDireto(mesa, botao));
+});
 
 // ========================================
 // REALTIME (Supabase)
@@ -764,7 +910,7 @@ async function lidarComInsercao(payload) {
 
   const { data: itens, error } = await supabase
     .from('pedido_itens')
-    .select('nome:nome_snapshot, preco:preco_unitario, quantidade')
+    .select('id, nome:nome_snapshot, preco:preco_unitario, quantidade')
     .eq('pedido_id', novo.id);
 
   pedidos.push({ ...novo, itens: error ? [] : itens });

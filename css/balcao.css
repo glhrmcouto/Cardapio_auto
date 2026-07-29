@@ -144,6 +144,29 @@
   color: var(--cinza-claro);
 }
 
+.pedido-card__item-fim {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pedido-card__item-remover {
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  background: rgba(255, 107, 107, 0.1);
+  color: #ff6b6b;
+  width: 1.4rem;
+  height: 1.4rem;
+  line-height: 1;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pedido-card__item-remover:hover {
+  background: rgba(255, 107, 107, 0.25);
+}
+
 .pedido-card__total {
   font-family: var(--fonte-titulo);
   font-weight: 700;
@@ -440,6 +463,12 @@
 .mesa-ativa-card__vazio {
   color: var(--cinza-claro);
   font-size: 0.88rem;
+}
+
+.mesa-ativa-card__fechar {
+  align-self: flex-end;
+  font-size: 0.9rem;
+  padding: 0.55rem 1.4rem;
 }
 
 /*MODAL: HISTÓRICO DE PEDIDOS*/
