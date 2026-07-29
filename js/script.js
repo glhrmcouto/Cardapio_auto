@@ -349,16 +349,16 @@ function mostrarAcessoBloqueado() {
 // Mesa+token da mesa válidos, mas sem sessão aberta pra essa mesa AGORA —
 // cobre tanto "a conta foi encerrada enquanto eu olhava o cardápio" (evento
 // em tempo real, ver inscreverRealtimeSessao) quanto "F5/nova visita numa
-// mesa sem ninguém sentado". Mostra "Iniciar novo pedido": só o toque nele
-// (ver abrirNovoPedido) chama abrir_sessao e libera o cardápio. É a tela que
-// aparece de fato logo depois de "Fechar a conta toda", por isso a mensagem
-// de despedida.
+// mesa sem ninguém sentado". É a tela que aparece de fato logo depois de
+// "Fechar a conta toda", por isso a mensagem de despedida. Sem botão, a
+// pedido explícito — abrir_sessao (único caminho pra reabrir a mesa, ver
+// supabase/017_token_sessao.sql) não é mais chamado por ninguém depois disso.
 function mostrarSemSessao() {
   sessaoPendente = null;
   travarTela(
     'Conta encerrada',
     'Obrigado pela visita! 🧡 Foi um prazer ter você no AOOBA! BAR. Esperamos te ver de novo em breve.',
-    ['iniciar']
+    []
   );
   contaEncerradaAssinatura.style.display = '';
 }
