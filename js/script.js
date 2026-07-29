@@ -336,30 +336,31 @@ function travarTela(titulo, texto, botoes) {
 }
 
 // Sem mesa+token da mesa válidos na URL. Sem botão — só re-escanear o QR
-// físico resolve. É o estado que cobre o encerramento de fato da visita
-// (ex.: F5 depois de "Conta encerrada"), por isso a mensagem de despedida.
+// físico resolve.
 function mostrarAcessoBloqueado() {
   sessaoPendente = null;
   travarTela(
     'Conta encerrada',
-    'Obrigado pela visita! 🧡 Foi um prazer ter você no AOOBA! BAR. Esperamos te ver de novo em breve.',
+    'Se você acabou de sentar, escaneie o QR code da mesa novamente para começar um novo pedido.',
     []
   );
-  contaEncerradaAssinatura.style.display = '';
 }
 
 // Mesa+token da mesa válidos, mas sem sessão aberta pra essa mesa AGORA —
 // cobre tanto "a conta foi encerrada enquanto eu olhava o cardápio" (evento
 // em tempo real, ver inscreverRealtimeSessao) quanto "F5/nova visita numa
 // mesa sem ninguém sentado". Mostra "Iniciar novo pedido": só o toque nele
-// (ver abrirNovoPedido) chama abrir_sessao e libera o cardápio.
+// (ver abrirNovoPedido) chama abrir_sessao e libera o cardápio. É a tela que
+// aparece de fato logo depois de "Fechar a conta toda", por isso a mensagem
+// de despedida.
 function mostrarSemSessao() {
   sessaoPendente = null;
   travarTela(
     'Conta encerrada',
-    `Não há pedido em aberto na Mesa ${mesaAtualValor()} no momento. Se você acabou de sentar, toque abaixo para começar um pedido novo.`,
+    'Obrigado pela visita! 🧡 Foi um prazer ter você no AOOBA! BAR. Esperamos te ver de novo em breve.',
     ['iniciar']
   );
+  contaEncerradaAssinatura.style.display = '';
 }
 
 // Mesa+token da mesa válidos e JÁ HÁ sessão aberta, mas este navegador não
