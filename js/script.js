@@ -307,7 +307,6 @@ const contaEncerradaModal = document.getElementById('contaEncerradaModal');
 const contaEncerradaTitulo = document.getElementById('contaEncerradaTitulo');
 const contaEncerradaTexto = document.getElementById('contaEncerradaTexto');
 const contaEncerradaAcoes = document.getElementById('contaEncerradaAcoes');
-const contaEncerradaAssinatura = document.getElementById('contaEncerradaAssinatura');
 const cancelarEntradaBtn = document.getElementById('cancelarEntradaBtn');
 const entrarSessaoBtn = document.getElementById('entrarSessaoBtn');
 const iniciarPedidoBtn = document.getElementById('iniciarPedidoBtn');
@@ -326,7 +325,6 @@ function travarTela(titulo, texto, botoes) {
   salvarSessao(null, null);
   contaEncerradaTitulo.textContent = titulo;
   contaEncerradaTexto.textContent = texto;
-  contaEncerradaAssinatura.style.display = 'none';
   contaEncerradaAcoes.style.display = botoes.length > 0 ? 'flex' : 'none';
   cancelarEntradaBtn.style.display = botoes.includes('cancelar') ? '' : 'none';
   entrarSessaoBtn.style.display = botoes.includes('entrar') ? '' : 'none';
@@ -346,13 +344,11 @@ function mostrarAcessoBloqueado() {
   );
 }
 
-// Mesa+token da mesa válidos, mas sem sessão aberta pra essa mesa AGORA — a
-// checagem de rotina ao carregar a página (primeira visita à mesa, F5 muito
-// depois de qualquer fechamento, ou erro de rede na consulta). Mostra
-// "Iniciar novo pedido": só o toque nele (ver abrirNovoPedido) chama
-// abrir_sessao e libera o cardápio — é o único caminho do cliente pra abrir
-// sessão, então essa tela PRECISA manter o botão (re-escanear o QR cai
-// exatamente aqui de novo).
+// Mesa+token da mesa válidos, mas sem sessão aberta pra essa mesa AGORA —
+// cobre tanto "a conta foi encerrada enquanto eu olhava o cardápio" (evento
+// em tempo real, ver inscreverRealtimeSessao) quanto "F5/nova visita numa
+// mesa sem ninguém sentado". Mostra "Iniciar novo pedido": só o toque nele
+// (ver abrirNovoPedido) chama abrir_sessao e libera o cardápio.
 function mostrarSemSessao() {
   sessaoPendente = null;
   travarTela(
@@ -360,22 +356,6 @@ function mostrarSemSessao() {
     `Não há pedido em aberto na Mesa ${mesaAtualValor()} no momento. Se você acabou de sentar, toque abaixo para começar um pedido novo.`,
     ['iniciar']
   );
-}
-
-// A conta REALMENTE acabou de fechar enquanto esta aba estava em uso — evento
-// em tempo real (ver inscreverRealtimeSessao) ou uma tentativa de pedir/ver
-// conta/fechar recusada com SESSAO_ENCERRADA. Mensagem de despedida, sem
-// botão: é o bloqueio que evita continuar pedindo numa sessão já encerrada
-// (o furo do F5 antigo). Um re-scan do QR físico da mesa recai em
-// mostrarSemSessao, que libera "Iniciar novo pedido" normalmente.
-function mostrarContaFechada() {
-  sessaoPendente = null;
-  travarTela(
-    'Conta encerrada',
-    'Obrigado pela visita! 🧡 Foi um prazer ter você no AOOBA! BAR. Esperamos te ver de novo em breve.',
-    []
-  );
-  contaEncerradaAssinatura.style.display = '';
 }
 
 // Mesa+token da mesa válidos e JÁ HÁ sessão aberta, mas este navegador não
@@ -427,7 +407,7 @@ function inscreverRealtimeSessao() {
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'sessoes', filter: `id=eq.${sessaoId}` },
       (payload) => {
-        if (payload.new.status === 'fechada') mostrarContaFechada();
+        if (payload.new.status === 'fechada') mostrarSemSessao();
       }
     )
     .subscribe();
@@ -825,9 +805,10 @@ async function fazerPedido() {
     console.error('Erro ao enviar pedido:', erro);
 
     if (ehErroSessaoEncerrada(erro)) {
-      // A conta já fechou nesse meio tempo (ver mostrarContaFechada). O
-      // carrinho fica como está; só um re-scan do QR libera o cardápio de novo.
-      mostrarContaFechada();
+      // Trava a tela em "Iniciar novo pedido" (ver mostrarSemSessao, na
+      // seção "BLOQUEIO DE ACESSO + TOKEN DE SESSÃO"). O carrinho fica como
+      // está; só um toque explícito nesse botão libera o cardápio de novo.
+      mostrarSemSessao();
       return;
     }
 
@@ -1047,7 +1028,7 @@ async function abrirModalFecharConta(mesa) {
 
     if (ehErroSessaoEncerrada(erro)) {
       fecharModalFecharConta();
-      mostrarContaFechada();
+      mostrarSemSessao();
       return;
     }
 
@@ -1138,7 +1119,7 @@ async function confirmarFecharConta() {
 
     if (ehErroSessaoEncerrada(erro)) {
       fecharModalFecharConta();
-      mostrarContaFechada();
+      mostrarSemSessao();
       return;
     }
 
