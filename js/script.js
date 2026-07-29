@@ -216,120 +216,86 @@ if (mesaDaUrl) {
 }
 
 // ========================================
-// BLOQUEIO DE ACESSO + VÍNCULO DE SESSÃO
+// BLOQUEIO DE ACESSO + TOKEN DE SESSÃO
 // ========================================
 //
 // BLOQUEIO DE ACESSO (item 3): o número da mesa é adivinhável (é só um
-// inteiro pequeno na URL); o token não (ver mesas.token em
+// inteiro pequeno na URL); o token DA MESA não (ver mesas.token em
 // supabase/005_seguranca.sql). Por isso a ÚNICA forma de liberar o cardápio
 // pra pedido é abrir o link do QR físico da mesa, que traz os dois:
 // ?mesa=N&t=TOKEN. Sem os dois, nem tenta consultar sessão nenhuma — trava
-// direto na tela "Conta encerrada" (reaproveitada aqui como "acesso
-// bloqueado"), pedindo pra escanear o QR. A validação de verdade continua
-// sendo a do servidor (criar_pedido/pedir_fechamento/conta_da_mesa exigem e
-// conferem o token — ver 005_seguranca.sql e 014_sessao_vinculada.sql);
-// isso aqui só evita mostrar uma UI de pedido que o banco ia recusar de
+// direto na tela "acesso bloqueado", pedindo pra escanear o QR. A validação
+// de verdade continua sendo a do servidor (criar_pedido/pedir_fechamento/
+// conta_da_mesa exigem e conferem o token — ver 005_seguranca.sql); isso
+// aqui só evita mostrar uma UI de pedido que o banco ia recusar de
 // qualquer jeito.
 const temAcessoValido = Boolean(mesaDaUrl && tokenMesa);
 
-// VÍNCULO DE SESSÃO (corrige o bug de "mesa que vira" — ver
-// supabase/014_sessao_vinculada.sql): sem isso, criar_pedido/
-// pedir_fechamento/conta_da_mesa só sabiam "qual é a sessão aberta da mesa
-// AGORA" (pelo número da mesa) — não "em qual sessão ESTE celular estava".
-// Se o garçom fechasse a conta (encerrar_sessao, manual ou automático — ver
-// 015_encerramento_automatico.sql) e um cliente novo sentasse na mesma
-// mesa, um celular antigo que ainda estivesse com o cardápio aberto
-// conseguia mandar pedido, e ele caía direto na comanda do cliente novo.
+// TOKEN DE SESSÃO (ver supabase/017_token_sessao.sql): o token DA MESA acima
+// é PERMANENTE — só identifica "isto é a mesa N", nunca muda, o QR impresso
+// vale pra sempre. Quem AUTORIZA pedir/fechar conta numa rodada específica é
+// o token de sessão, temporário: nasce quando a sessão abre e para de valer
+// automaticamente assim que ela deixa de estar 'aberta' (fechamento manual,
+// automático ou por expiração — não importa o motivo).
 //
-// Todo pedido/fechamento carrega o session_id que o navegador tem guardado
-// (sessaoId). O servidor recusa com 'SESSAO_ENCERRADA' se esse session_id
-// não for mais o da sessão aberta da mesa — nesse caso a UI trava
-// PERMANENTEMENTE no overlay "Conta encerrada": diferente da versão
-// anterior desta tela, não existe mais um botão que reabre/reaproveita
-// sessão pela própria página — a única saída é re-escanear o QR físico
-// (mesmo raciocínio do bloqueio de acesso acima: garante que só quem está
-// fisicamente na mesa consegue voltar a pedir).
+// Todo pedido/fechamento carrega o tokenSessao que o navegador tem guardado.
+// O servidor recusa com 'SESSAO_ENCERRADA' se ele não corresponder a uma
+// sessão aberta da mesa — nesse caso a tela trava em "Iniciar novo pedido":
+// só um toque explícito nesse botão (nunca o carregamento da página sozinho,
+// nunca um evento em tempo real sozinho) chama abrir_sessao e gera um token
+// de sessão novo. É isso que fecha o furo do F5: depois de fechar a conta e
+// sair, um F5 em casa ainda tem o token DA MESA batendo (ele é permanente),
+// mas o token de sessão guardado morreu com o fechamento — o cardápio não
+// libera sozinho.
 
 const SESSAO_ID_KEY = 'aooba_sessao_id';
+const SESSAO_TOKEN_KEY = 'aooba_sessao_token';
 const SESSAO_MESA_KEY = 'aooba_sessao_mesa';
 
 let sessaoId = null;
+let tokenSessao = null;
 let canalSessao = null;
 
 function mesaAtualValor() {
   return mesaDaUrl || mesaInput.value.trim();
 }
 
-// Lê o session_id salvo de uma visita anterior a esta mesma mesa. IMPORTANTE:
-// isso NUNCA autoriza nada sozinho — é usado só como valor de COMPARAÇÃO em
-// atualizarSessaoAtual, pra detectar "essa sessão que eu tinha guardada
-// ainda é a mesma que o servidor diz estar aberta?". sessaoId (a variável
-// que de fato viaja nos pedidos) só é setado depois dessa validação.
+// Lê a sessão guardada de uma visita anterior a ESTA mesma mesa/aba.
+// IMPORTANTE: isso nunca autoriza nada sozinho — é usado só como valor de
+// COMPARAÇÃO em atualizarEstadoSessao, pra decidir "esta sessão que o
+// servidor diz estar aberta é a mesma que eu já tinha confirmado entrar
+// antes, ou é uma que eu preciso confirmar de novo?".
 function lerSessaoStorage() {
   const mesaGuardada = sessionStorage.getItem(SESSAO_MESA_KEY);
   const idGuardado = sessionStorage.getItem(SESSAO_ID_KEY);
-  return mesaGuardada && idGuardado && mesaGuardada === mesaAtualValor() ? idGuardado : null;
+  const tokenGuardado = sessionStorage.getItem(SESSAO_TOKEN_KEY);
+  if (mesaGuardada && idGuardado && tokenGuardado && mesaGuardada === mesaAtualValor()) {
+    return { sessaoId: idGuardado, tokenSessao: tokenGuardado };
+  }
+  return null;
 }
 
-// Atualiza sessaoId (memória + sessionStorage) e reassina a trava em tempo
-// real pra essa sessão nova — chamada tanto pela consulta inicial (depois de
-// validada, ver atualizarSessaoAtual) quanto pelo session_id que volta em
-// cada pedido/fechamento bem-sucedido.
-function salvarSessao(id) {
+// Guarda sessaoId/tokenSessao (memória + sessionStorage) e reassina a trava
+// em tempo real pra essa sessão — chamada só depois de CONFIRMADO que esta
+// aba pode usar essa sessão (sessao_atual com token já guardado, ou toque
+// explícito em "Entrar na conta"/"Iniciar novo pedido"). Nula os dois (id e
+// token) pra travar a tela — nunca um sem o outro.
+function salvarSessao(id, token) {
   sessaoId = id;
-  if (id) {
+  tokenSessao = token;
+  if (id && token) {
     sessionStorage.setItem(SESSAO_ID_KEY, id);
+    sessionStorage.setItem(SESSAO_TOKEN_KEY, token);
     sessionStorage.setItem(SESSAO_MESA_KEY, mesaAtualValor());
   } else {
     sessionStorage.removeItem(SESSAO_ID_KEY);
+    sessionStorage.removeItem(SESSAO_TOKEN_KEY);
     sessionStorage.removeItem(SESSAO_MESA_KEY);
   }
   inscreverRealtimeSessao();
 }
 
-// Verdade vinda do servidor sobre qual é a sessão aberta da mesa agora —
-// SEMPRE reconferida no carregamento da página; o sessionStorage nunca
-// autoriza sozinho (regra 1: a URL manda, o storage nunca). Corrige o furo
-// em que um F5 depois de "Conta encerrada" reaproveitava o session_id
-// antigo do storage sem re-checar nada: antes, sessaoId era preenchido
-// direto de lerSessaoStorage() e essa função só sobrescrevia silenciosamente
-// com o que o servidor respondesse, sem nunca travar a tela nesse caminho.
-async function atualizarSessaoAtual() {
-  const mesaValor = mesaAtualValor();
-  if (!mesaValor) return;
-
-  // Candidato guardado de uma visita anterior a ESTA mesma mesa/aba — pode
-  // já estar morto (sessão encerrada enquanto a aba estava fechada ou em
-  // segundo plano, sem receber o Realtime). Só serve de comparação abaixo,
-  // nunca é atribuído a sessaoId antes de validar.
-  const sessaoAnterior = lerSessaoStorage();
-
-  try {
-    const { data, error } = await supabase.rpc('sessao_atual', { p_mesa: Number(mesaValor), p_token: tokenMesa });
-    if (error) throw error;
-
-    if (sessaoAnterior && sessaoAnterior !== data) {
-      // Tínhamos uma sessão guardada e ela NÃO é (mais) a sessão aberta
-      // atual da mesa, segundo o servidor — foi encerrada nesse meio-tempo
-      // (ou uma sessão diferente abriu depois). Nunca reaproveita
-      // silenciosamente: trava a tela (mostrarContaEncerrada já limpa o
-      // storage) em vez de liberar o cardápio como se nada tivesse acontecido.
-      mostrarContaEncerrada();
-      return;
-    }
-
-    salvarSessao(data);
-  } catch (erro) {
-    console.error('Erro ao consultar sessão atual:', erro);
-    // Sem resposta do servidor não dá pra confirmar NEM invalidar a sessão
-    // guardada — por segurança, não reaproveita ela otimistamente (regra 1).
-    // sessaoId fica null; qualquer pedido/fechamento tentado nesse meio-tempo
-    // ainda é validado de novo no banco (criar_pedido etc. exigem o token e
-    // conferem a sessão de qualquer forma).
-  }
-}
-
-// Distingue a recusa "SESSAO_ENCERRADA" (ver supabase/014_sessao_vinculada.sql)
+// Distingue a recusa "SESSAO_ENCERRADA" (ver supabase/017_token_sessao.sql)
 // de qualquer outro erro de RPC — usa error.details (onde o Postgres/PostgREST
 // colocam o DETAIL de uma exceção), nunca o texto da mensagem.
 function ehErroSessaoEncerrada(erro) {
@@ -338,22 +304,95 @@ function ehErroSessaoEncerrada(erro) {
 
 const contaEncerradaOverlay = document.getElementById('contaEncerradaOverlay');
 const contaEncerradaModal = document.getElementById('contaEncerradaModal');
+const contaEncerradaTitulo = document.getElementById('contaEncerradaTitulo');
+const contaEncerradaTexto = document.getElementById('contaEncerradaTexto');
+const contaEncerradaAcoes = document.getElementById('contaEncerradaAcoes');
+const cancelarEntradaBtn = document.getElementById('cancelarEntradaBtn');
+const entrarSessaoBtn = document.getElementById('entrarSessaoBtn');
+const iniciarPedidoBtn = document.getElementById('iniciarPedidoBtn');
 
-// Trava permanentemente a tela (sem botão de saída — ver comentário no topo
-// desta seção) e limpa qualquer session_id antigo do sessionStorage, pra
-// não restar estado que permita burlar o bloqueio numa próxima visita a
-// essa mesma aba/mesa.
-function mostrarContaEncerrada() {
-  salvarSessao(null);
+// {sessaoId, tokenSessao} de uma sessão aberta encontrada por
+// atualizarEstadoSessao mas ainda NÃO confirmada por este navegador — fica
+// guardada só em memória (nunca em sessionStorage: até o toque em "Entrar na
+// conta" ela não vale nada) enquanto a tela mostra a confirmação.
+let sessaoPendente = null;
+
+// Trava a tela reaproveitando o mesmo modal pros três estados (ver
+// index.html) — limpa qualquer sessão CONFIRMADA guardada, pra não restar
+// estado que permita burlar a trava numa próxima checagem. "botoes" é a
+// lista de ids a mostrar: 'cancelar', 'entrar', 'iniciar', ou [] pra nenhum.
+function travarTela(titulo, texto, botoes) {
+  salvarSessao(null, null);
+  contaEncerradaTitulo.textContent = titulo;
+  contaEncerradaTexto.textContent = texto;
+  contaEncerradaAcoes.style.display = botoes.length > 0 ? 'flex' : 'none';
+  cancelarEntradaBtn.style.display = botoes.includes('cancelar') ? '' : 'none';
+  entrarSessaoBtn.style.display = botoes.includes('entrar') ? '' : 'none';
+  iniciarPedidoBtn.style.display = botoes.includes('iniciar') ? '' : 'none';
   contaEncerradaOverlay.classList.add('is-open');
   contaEncerradaModal.classList.add('is-open');
 }
 
+// Sem mesa+token da mesa válidos na URL. Sem botão — só re-escanear o QR
+// físico resolve.
+function mostrarAcessoBloqueado() {
+  sessaoPendente = null;
+  travarTela(
+    'Conta encerrada',
+    'Se você acabou de sentar, escaneie o QR code da mesa novamente para começar um novo pedido.',
+    []
+  );
+}
+
+// Mesa+token da mesa válidos, mas sem sessão aberta pra essa mesa AGORA —
+// cobre tanto "a conta foi encerrada enquanto eu olhava o cardápio" (evento
+// em tempo real, ver inscreverRealtimeSessao) quanto "F5/nova visita numa
+// mesa sem ninguém sentado". Mostra "Iniciar novo pedido": só o toque nele
+// (ver abrirNovoPedido) chama abrir_sessao e libera o cardápio.
+function mostrarSemSessao() {
+  sessaoPendente = null;
+  travarTela(
+    'Conta encerrada',
+    `Não há pedido em aberto na Mesa ${mesaAtualValor()} no momento. Se você acabou de sentar, toque abaixo para começar um pedido novo.`,
+    ['iniciar']
+  );
+}
+
+// Mesa+token da mesa válidos e JÁ HÁ sessão aberta, mas este navegador não
+// tem o token_sessao dela guardado (celular novo entrando na mesa, ou aba
+// sem nada guardado) — ver TESTE em supabase/017_token_sessao.sql. Isto é só
+// uma BARREIRA DE UX contra entrar sem querer na conta de outro grupo; a
+// segurança de verdade contra o furo do F5 continua sendo o token_sessao
+// invalidado no servidor quando a sessão fecha (validado de novo em toda
+// chamada de criar_pedido/pedir_fechamento/conta_da_mesa, token ou não).
+// Guarda a sessão em sessaoPendente — só vira "de verdade" (salvarSessao) se
+// a pessoa tocar "Entrar na conta".
+function mostrarConfirmarEntrada(sessao) {
+  sessaoPendente = sessao;
+  travarTela(
+    'Conta encerrada',
+    `A Mesa ${mesaAtualValor()} já tem uma conta aberta. Deseja entrar nela para pedir junto?`,
+    ['cancelar', 'entrar']
+  );
+}
+
+function destravarTela() {
+  contaEncerradaOverlay.classList.remove('is-open');
+  contaEncerradaModal.classList.remove('is-open');
+}
+
+// Roda toda vez que a tela destrava (sessão nova, reaproveitada ou
+// confirmada) — só falta pedir o nome se esta aba ainda não tiver um guardado.
+function aposEntrarNaSessao() {
+  destravarTela();
+  if (!clienteNome) abrirModalNome();
+}
+
 // Trava em tempo real — só CONFORTO (UX): reage na hora se a sessão fechar
 // enquanto a página está aberta, sem esperar a pessoa tentar pedir de novo.
-// A defesa de verdade é a validação de session_id dentro de
+// A defesa de verdade é a validação de token_sessao dentro de
 // criar_pedido/pedir_fechamento/conta_da_mesa no banco (ver
-// supabase/014_sessao_vinculada.sql) — o Realtime pode atrasar ou a conexão
+// supabase/017_token_sessao.sql) — o Realtime pode atrasar ou a conexão
 // pode cair sem a gente perceber, então NUNCA confie só nisso aqui.
 function inscreverRealtimeSessao() {
   if (canalSessao) {
@@ -368,19 +407,114 @@ function inscreverRealtimeSessao() {
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'sessoes', filter: `id=eq.${sessaoId}` },
       (payload) => {
-        if (payload.new.status === 'fechada') mostrarContaEncerrada();
+        if (payload.new.status === 'fechada') mostrarSemSessao();
       }
     )
     .subscribe();
 }
 
+// Verdade vinda do servidor sobre a sessão aberta da mesa agora — SEMPRE
+// reconferida no carregamento da página (regra 1: a URL manda, o storage
+// nunca autoriza sozinho). Três desfechos:
+//   - nenhuma sessão aberta -> mostrarSemSessao ("Iniciar novo pedido");
+//   - sessão aberta E este navegador já tinha guardado exatamente ela (mesmo
+//     sessao_id, mesmo token_sessao) -> entra direto, sem reperguntar;
+//   - sessão aberta mas SEM esse token guardado -> mostrarConfirmarEntrada,
+//     só entra no toque explícito em "Entrar na conta".
+async function atualizarEstadoSessao() {
+  const mesaValor = mesaAtualValor();
+  if (!mesaValor) return;
+
+  // Candidata de uma visita anterior a ESTA mesma mesa/aba — só serve de
+  // comparação abaixo, nunca é adotada antes de bater com o que o servidor
+  // confirma estar aberto agora.
+  const guardada = lerSessaoStorage();
+
+  try {
+    const { data, error } = await supabase.rpc('sessao_atual', { p_mesa: Number(mesaValor), p_token: tokenMesa });
+    if (error) throw error;
+
+    if (!data) {
+      mostrarSemSessao();
+      return;
+    }
+
+    const jaConfirmamosEssaSessao = guardada
+      && guardada.sessaoId === data.sessao_id
+      && guardada.tokenSessao === data.token_sessao;
+
+    if (jaConfirmamosEssaSessao) {
+      salvarSessao(data.sessao_id, data.token_sessao);
+      aposEntrarNaSessao();
+    } else {
+      mostrarConfirmarEntrada({ sessaoId: data.sessao_id, tokenSessao: data.token_sessao });
+    }
+  } catch (erro) {
+    console.error('Erro ao consultar sessão atual:', erro);
+    // Sem resposta do servidor não dá pra confirmar nada — por segurança,
+    // trava em vez de liberar o cardápio otimisticamente (regra 1). O botão
+    // "Iniciar novo pedido" também serve pra tentar de novo nesse caso.
+    mostrarSemSessao();
+  }
+}
+
+// Único caminho de CRIAÇÃO de sessão pro cliente — só sob o toque explícito
+// neste botão (ver mostrarSemSessao), nunca automático.
+async function abrirNovoPedido() {
+  const mesaValor = mesaAtualValor();
+  if (!mesaValor) return;
+
+  iniciarPedidoBtn.disabled = true;
+  iniciarPedidoBtn.textContent = 'Abrindo...';
+
+  try {
+    const { data, error } = await supabase.rpc('abrir_sessao', { p_mesa: Number(mesaValor), p_token: tokenMesa });
+    if (error) throw error;
+
+    salvarSessao(data.sessao_id, data.token_sessao);
+    aposEntrarNaSessao();
+  } catch (erro) {
+    console.error('Erro ao abrir novo pedido:', erro);
+    mostrarToast(erro.message || 'Não foi possível iniciar o pedido agora. Verifique sua conexão e tente de novo.');
+  } finally {
+    iniciarPedidoBtn.disabled = false;
+    iniciarPedidoBtn.textContent = 'Iniciar novo pedido';
+  }
+}
+
+// Só entra na sessão vigente com o toque explícito em "Entrar na conta" (ver
+// mostrarConfirmarEntrada) — adota o token_sessao que já tinha vindo de
+// sessao_atual, sem precisar de outra chamada ao servidor.
+function entrarNaSessaoExistente() {
+  if (!sessaoPendente) return;
+  const { sessaoId: id, tokenSessao: token } = sessaoPendente;
+  sessaoPendente = null;
+  salvarSessao(id, token);
+  aposEntrarNaSessao();
+}
+
+// "Cancelar" na confirmação de entrada: mantém a tela travada, sem acesso ao
+// cardápio (ver supabase/017_token_sessao.sql) — descarta a sessão pendente
+// e cai no mesmo bloqueio "sem botão" de mostrarAcessoBloqueado. Pra tentar
+// de novo, só re-escaneando o QR (ou recarregando a página, que refaz a
+// mesma checagem em atualizarEstadoSessao).
+function cancelarEntradaSessao() {
+  sessaoPendente = null;
+  travarTela(
+    'Conta encerrada',
+    'Tudo bem. Se quiser pedir na Mesa ' + mesaAtualValor() + ', escaneie o QR code da mesa novamente.',
+    []
+  );
+}
+
+iniciarPedidoBtn.addEventListener('click', abrirNovoPedido);
+entrarSessaoBtn.addEventListener('click', entrarNaSessaoExistente);
+cancelarEntradaBtn.addEventListener('click', cancelarEntradaSessao);
+
 if (temAcessoValido) {
-  // sessaoId começa null e só é preenchido depois de atualizarSessaoAtual
-  // validar (ou não) o que estiver no sessionStorage contra o servidor —
-  // nunca antes disso (regra 1: a URL manda, o storage nunca autoriza sozinho).
-  atualizarSessaoAtual();
+  atualizarEstadoSessao();
 } else {
-  mostrarContaEncerrada();
+  mostrarAcessoBloqueado();
 }
 
 // ========================================
@@ -462,10 +596,11 @@ nomeInput.addEventListener('keydown', (event) => {
 trocarNomeBtn.addEventListener('click', abrirModalNome);
 
 atualizarLabelNome();
-// Sem acesso válido (ver temAcessoValido), a tela já está travada no
-// overlay "Conta encerrada" — não faz sentido empilhar o modal de nome por
-// cima dele.
-if (temAcessoValido && !clienteNome) abrirModalNome();
+// Sem sessão ativa (acesso bloqueado OU sem sessão aberta ainda), a tela já
+// está travada no overlay — não faz sentido empilhar o modal de nome por
+// cima dele. O modal de nome só abre depois de entrar numa sessão de
+// verdade (ver aposEntrarNaSessao, na seção "BLOQUEIO DE ACESSO + TOKEN DE
+// SESSÃO"), não mais aqui incondicionalmente.
 
 const cartFab = document.getElementById('cartFab');
 const cartBadge = document.getElementById('cartBadge');
@@ -651,21 +786,16 @@ async function fazerPedido() {
   cartSubmit.textContent = 'Enviando...';
 
   try {
-    const { data, error } = await supabase.rpc('criar_pedido', {
+    const { error } = await supabase.rpc('criar_pedido', {
       p_mesa: Number(mesaValor),
       p_token: tokenMesa,
       p_itens: itensPayload,
       p_cliente_nome: clienteNome,
       p_cliente_id: clienteId,
-      p_session_id: sessaoId,
+      p_token_sessao: tokenSessao,
     });
 
     if (error) throw error;
-
-    // Guarda o session_id que o servidor efetivamente usou (abriu uma sessão
-    // nova agora, ou confirmou a que já tínhamos) — os próximos pedidos desta
-    // visita passam a usar esse mesmo id (ver supabase/014_sessao_vinculada.sql).
-    salvarSessao(data.sessao_id);
 
     fecharCarrinho();
     mostrarPedidoConfirmado();
@@ -675,11 +805,10 @@ async function fazerPedido() {
     console.error('Erro ao enviar pedido:', erro);
 
     if (ehErroSessaoEncerrada(erro)) {
-      // Trava a tela de vez — não existe mais reenvio nem reabertura de
-      // sessão pela própria página (ver comentário no topo da seção
-      // "BLOQUEIO DE ACESSO + VÍNCULO DE SESSÃO"). O carrinho fica como
-      // está; a única saída daqui é re-escanear o QR físico da mesa.
-      mostrarContaEncerrada();
+      // Trava a tela em "Iniciar novo pedido" (ver mostrarSemSessao, na
+      // seção "BLOQUEIO DE ACESSO + TOKEN DE SESSÃO"). O carrinho fica como
+      // está; só um toque explícito nesse botão libera o cardápio de novo.
+      mostrarSemSessao();
       return;
     }
 
@@ -884,7 +1013,7 @@ async function abrirModalFecharConta(mesa) {
       p_mesa: Number(mesa),
       p_token: tokenMesa,
       p_cliente_id: clienteId,
-      p_session_id: sessaoId,
+      p_token_sessao: tokenSessao,
     });
 
     if (error) throw error;
@@ -899,7 +1028,7 @@ async function abrirModalFecharConta(mesa) {
 
     if (ehErroSessaoEncerrada(erro)) {
       fecharModalFecharConta();
-      mostrarContaEncerrada();
+      mostrarSemSessao();
       return;
     }
 
@@ -975,15 +1104,14 @@ async function confirmarFecharConta() {
   fecharContaConfirmar.disabled = true;
 
   try {
-    const { data, error } = await supabase.rpc('pedir_fechamento', {
+    const { error } = await supabase.rpc('pedir_fechamento', {
       p_mesa: Number(mesa),
       p_token: tokenMesa,
-      p_session_id: sessaoId,
+      p_token_sessao: tokenSessao,
     });
 
     if (error) throw error;
 
-    salvarSessao(data.sessao_id);
     fecharModalFecharConta();
     mostrarToast('Pedido de fechamento enviado! O garçom já foi avisado.');
   } catch (erro) {
@@ -991,7 +1119,7 @@ async function confirmarFecharConta() {
 
     if (ehErroSessaoEncerrada(erro)) {
       fecharModalFecharConta();
-      mostrarContaEncerrada();
+      mostrarSemSessao();
       return;
     }
 

@@ -273,21 +273,35 @@
     </div>
   </div>
 
-  <!-- ===== MODAL: CONTA ENCERRADA / ACESSO BLOQUEADO ===== -->
-  <!-- Mesma tela pros dois casos (ver js/script.js): a sessão virou 'fechada'
-       enquanto a página estava aberta, OU a página nunca teve token válido na
-       URL pra começo de conversa (visita sem QR/link direto com só ?mesa=).
-       Sem botão nenhum de propósito — não existe mais um caminho que
-       reaproveita/reabre sessão pela própria página; a única saída é
-       re-escanear o QR físico da mesa (ele carrega ?mesa=N&t=TOKEN, e só o
-       token garante que quem está pedindo está fisicamente na mesa — ver
-       supabase/014_sessao_vinculada.sql). -->
+  <!-- ===== MODAL: ACESSO BLOQUEADO / SEM SESSÃO ABERTA / CONFIRMAR ENTRADA ===== -->
+  <!-- Três estados diferentes com o mesmo visual (ver js/script.js):
+       1) ACESSO BLOQUEADO: a página nunca teve mesa+token da mesa válidos na
+          URL (visita sem QR/link direto, só ?mesa= digitado), OU a pessoa
+          cancelou a confirmação de entrada (estado 3). Sem botão — a única
+          saída é re-escanear o QR físico da mesa.
+       2) SEM SESSÃO ABERTA: mesa+token da mesa válidos, mas não há sessão
+          aberta pra essa mesa agora (conta acabou de ser encerrada, ou é a
+          primeira vez que alguém senta nela). Mostra "Iniciar novo pedido",
+          que abre uma sessão nova — com um token_sessao novo — só no toque.
+       3) CONFIRMAR ENTRADA: já existe sessão aberta pra essa mesa, mas este
+          navegador não tem o token_sessao dela (celular novo entrando na
+          mesma mesa, ou aba antiga sem nada guardado). Mostra "Cancelar" e
+          "Entrar na conta" — só o toque em "Entrar" adota o token vigente e
+          libera o cardápio.
+       Nenhum desses três acontece sozinho no reload nem por trás de um
+       evento em tempo real — sempre sob toque explícito (ver
+       supabase/017_token_sessao.sql). -->
   <div class="modal-overlay" id="contaEncerradaOverlay"></div>
   <div class="modal-panel modal-panel--nome" id="contaEncerradaModal" role="dialog" aria-modal="true" aria-labelledby="contaEncerradaTitulo">
     <div class="modal-panel__header">
       <span class="modal-panel__title" id="contaEncerradaTitulo">Conta encerrada</span>
     </div>
-    <p class="nome-modal__texto">Se você acabou de sentar, escaneie o QR code da mesa novamente para começar um novo pedido.</p>
+    <p class="nome-modal__texto" id="contaEncerradaTexto">Se você acabou de sentar, escaneie o QR code da mesa novamente para começar um novo pedido.</p>
+    <div class="modal-panel__acoes" id="contaEncerradaAcoes" style="display: none;">
+      <button type="button" class="btn btn--secondary" id="cancelarEntradaBtn" style="display: none;">Cancelar</button>
+      <button type="button" class="btn btn--primary" id="entrarSessaoBtn" style="display: none;">Entrar na conta</button>
+      <button type="button" class="btn btn--primary" id="iniciarPedidoBtn" style="display: none;">Iniciar novo pedido</button>
+    </div>
   </div>
 
   <!-- ===== CONFIRMAÇÃO CENTRAL DE PEDIDO ENVIADO ===== -->
