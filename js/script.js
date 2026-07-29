@@ -307,6 +307,7 @@ const contaEncerradaModal = document.getElementById('contaEncerradaModal');
 const contaEncerradaTitulo = document.getElementById('contaEncerradaTitulo');
 const contaEncerradaTexto = document.getElementById('contaEncerradaTexto');
 const contaEncerradaAcoes = document.getElementById('contaEncerradaAcoes');
+const contaEncerradaAssinatura = document.getElementById('contaEncerradaAssinatura');
 const cancelarEntradaBtn = document.getElementById('cancelarEntradaBtn');
 const entrarSessaoBtn = document.getElementById('entrarSessaoBtn');
 const iniciarPedidoBtn = document.getElementById('iniciarPedidoBtn');
@@ -325,6 +326,7 @@ function travarTela(titulo, texto, botoes) {
   salvarSessao(null, null);
   contaEncerradaTitulo.textContent = titulo;
   contaEncerradaTexto.textContent = texto;
+  contaEncerradaAssinatura.style.display = 'none';
   contaEncerradaAcoes.style.display = botoes.length > 0 ? 'flex' : 'none';
   cancelarEntradaBtn.style.display = botoes.includes('cancelar') ? '' : 'none';
   entrarSessaoBtn.style.display = botoes.includes('entrar') ? '' : 'none';
@@ -334,14 +336,16 @@ function travarTela(titulo, texto, botoes) {
 }
 
 // Sem mesa+token da mesa válidos na URL. Sem botão — só re-escanear o QR
-// físico resolve.
+// físico resolve. É o estado que cobre o encerramento de fato da visita
+// (ex.: F5 depois de "Conta encerrada"), por isso a mensagem de despedida.
 function mostrarAcessoBloqueado() {
   sessaoPendente = null;
   travarTela(
     'Conta encerrada',
-    'Se você acabou de sentar, escaneie o QR code da mesa novamente para começar um novo pedido.',
+    'Obrigado pela visita! 🧡 Foi um prazer ter você no AOOBA! BAR. Esperamos te ver de novo em breve.',
     []
   );
+  contaEncerradaAssinatura.style.display = '';
 }
 
 // Mesa+token da mesa válidos, mas sem sessão aberta pra essa mesa AGORA —
