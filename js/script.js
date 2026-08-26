@@ -260,6 +260,72 @@ let sessaoId = null;
 let tokenSessao = null;
 let canalSessao = null;
 
+// ========================================
+// MARCA DE "CONTA ENCERRADA" (localStorage)
+// ========================================
+//
+// sessionStorage (acima) já bloqueia F5 na MESMA aba (sobrevive a reload,
+// mas nasce vazio em toda aba nova). Isso deixa um furo: fechar a aba e
+// abrir outra (ou reabrir o navegador) com a mesma URL do QR volta pra
+// "Bem-vindo" como se fosse mesa livre, mesmo que ESTE aparelho tenha
+// acabado de encerrar a conta ali. aooba_encerrada tapa esse furo
+// guardando em localStorage (sobrevive a fechar/reabrir a aba) qual
+// sessão este aparelho tinha quando ela foi encerrada.
+//
+// IMPORTANTE — escopo aceito: é só uma trava de UX no localStorage, então
+// some numa aba anônima ou se alguém limpar os dados do navegador; a
+// defesa de verdade contra fraude continua sendo 100% do servidor — o
+// token_sessao invalidado (ver supabase/017_token_sessao.sql), validado
+// de novo em toda chamada de criar_pedido/pedir_fechamento/conta_da_mesa,
+// token ou não. Essa marca só evita mostrar a UI de "Bem-vindo" indevida;
+// nunca é o que decide se um pedido é aceito.
+const CONTA_ENCERRADA_KEY = 'aooba_encerrada';
+
+// Grava { mesa, session_id, encerrada_em } — chamada só com o id de uma
+// sessão que ESTE aparelho de fato tinha (ver mostrarContaFechada). Sem
+// sessaoIdEncerrada não grava nada (evita apagar uma marca válida com um
+// valor vazio por engano).
+function marcarContaEncerrada(mesa, sessaoIdEncerrada) {
+  if (!mesa || !sessaoIdEncerrada) return;
+  try {
+    localStorage.setItem(CONTA_ENCERRADA_KEY, JSON.stringify({
+      mesa: String(mesa),
+      session_id: sessaoIdEncerrada,
+      encerrada_em: new Date().toISOString(),
+    }));
+  } catch (erro) {
+    // localStorage indisponível (aba anônima restrita, cota cheia etc.) —
+    // sem a marca, o pior caso é cair de volta no comportamento só de
+    // sessionStorage; não trava a página por causa disso.
+    console.warn('Não foi possível gravar aooba_encerrada:', erro);
+  }
+}
+
+// Devolve a marca só se ela for desta MESMA mesa (marca de outra mesa —
+// ex.: o cliente sentou em outra mesa depois — não deve bloquear nada aqui).
+function lerContaEncerrada(mesa) {
+  try {
+    const bruto = localStorage.getItem(CONTA_ENCERRADA_KEY);
+    if (!bruto) return null;
+    const marca = JSON.parse(bruto);
+    return marca && marca.mesa === String(mesa) ? marca : null;
+  } catch (erro) {
+    console.warn('Não foi possível ler aooba_encerrada:', erro);
+    return null;
+  }
+}
+
+// Chamada quando este aparelho passa a ter uma sessão válida de novo (ver
+// salvarSessao) — o cliente legítimo que volta a pedir não pode ficar
+// travado pela marca de uma conta que já não importa mais.
+function limparContaEncerrada() {
+  try {
+    localStorage.removeItem(CONTA_ENCERRADA_KEY);
+  } catch (erro) {
+    console.warn('Não foi possível limpar aooba_encerrada:', erro);
+  }
+}
+
 function mesaAtualValor() {
   return mesaDaUrl || mesaInput.value.trim();
 }
@@ -291,6 +357,9 @@ function salvarSessao(id, token) {
     sessionStorage.setItem(SESSAO_ID_KEY, id);
     sessionStorage.setItem(SESSAO_TOKEN_KEY, token);
     sessionStorage.setItem(SESSAO_MESA_KEY, mesaAtualValor());
+    // Sessão válida de novo pra este aparelho — a marca de "conta
+    // encerrada" (se houver) já não representa o estado atual.
+    limparContaEncerrada();
   } else {
     sessionStorage.removeItem(SESSAO_ID_KEY);
     sessionStorage.removeItem(SESSAO_TOKEN_KEY);
@@ -362,14 +431,18 @@ function mostrarBoasVindas() {
   );
 }
 
-// Mesma falta de sessão aberta acima, mas ESTE navegador tinha guardado
-// session_id/token_sessao de uma sessão que não existe mais aberta — quem
-// estava de fato usando o cardápio encerrou a conta. Despedida, sem botão:
-// travarTela já limpa o storage (salvarSessao(null, null)), então um
-// re-scan do QR físico cai em mostrarBoasVindas na próxima checagem, não
-// de novo aqui.
-function mostrarContaFechada() {
+// Mesma falta de sessão aberta acima, mas ESTE aparelho tinha uma sessão
+// que não existe mais aberta — quem estava de fato usando o cardápio
+// encerrou a conta. Despedida, sem botão: só um re-scan do QR físico
+// resolve. "sessaoIdEncerrada" é o id dessa sessão (de sessionStorage ou
+// da marca em localStorage — ver mostrarSemSessaoOuEncerrada) e serve só
+// pra (re)gravar a marca aooba_encerrada, que sobrevive a fechar/reabrir a
+// aba (ver comentário em CONTA_ENCERRADA_KEY) — travarTela já limpa o
+// sessionStorage (salvarSessao(null, null)), que sozinho NÃO sobrevive a
+// isso.
+function mostrarContaFechada(sessaoIdEncerrada) {
   sessaoPendente = null;
+  marcarContaEncerrada(mesaAtualValor(), sessaoIdEncerrada);
   travarTela(
     'Conta encerrada',
     'Obrigado pela visita! 🧡 Foi um prazer ter você no AOOBA! BAR.',
@@ -378,14 +451,24 @@ function mostrarContaFechada() {
 }
 
 // Decide entre as duas acima quando sessao_atual não acha sessão aberta (ou
-// a própria consulta falha): "guardada" é o que lerSessaoStorage() achou
-// pra ESTA mesa/aba antes de perguntar ao servidor — se havia algo, é
-// porque este navegador estava numa sessão que não existe mais; se não
-// havia nada, é mesa nova/cliente novo.
+// a própria consulta falha). Duas fontes, nenhuma confia sozinha (regra 1:
+// a URL/servidor manda, storage nunca autoriza nada) — só decidem QUAL
+// tela mostrar:
+//   - "guardada" (sessionStorage) — sobrevive a F5 na MESMA aba;
+//   - a marca aooba_encerrada (localStorage) — sobrevive a fechar/reabrir
+//     a aba, cobre o F5-equivalente de abrir uma aba nova com a mesma URL.
+// Havendo qualquer uma das duas, é porque este aparelho estava numa sessão
+// que não existe mais — CASO B. Sem nenhuma, mesa nova/cliente novo — CASO A.
 function mostrarSemSessaoOuEncerrada(guardada) {
-  console.log('[sessao] sem sessão aberta — guardada:', guardada, '-> mostrando', guardada ? 'CASO B (conta encerrada)' : 'CASO A (boas-vindas)');
-  if (guardada) {
-    mostrarContaFechada();
+  const marca = lerContaEncerrada(mesaAtualValor());
+  const sessaoIdEncerrada = (guardada && guardada.sessaoId) || (marca && marca.session_id) || null;
+  console.log(
+    '[sessao] sem sessão aberta — guardada (sessionStorage):', guardada,
+    '| marca (localStorage):', marca,
+    '-> mostrando', sessaoIdEncerrada ? 'CASO B (conta encerrada)' : 'CASO A (boas-vindas)'
+  );
+  if (sessaoIdEncerrada) {
+    mostrarContaFechada(sessaoIdEncerrada);
   } else {
     mostrarBoasVindas();
   }
@@ -447,7 +530,7 @@ function inscreverRealtimeSessao() {
         // Esta aba estava de fato numa sessão (é por isso que inscreveu o
         // canal, logo acima) e ela fechou agora — sempre CASO B, sem
         // precisar checar o storage.
-        if (payload.new.status === 'fechada') mostrarContaFechada();
+        if (payload.new.status === 'fechada') mostrarContaFechada(sessaoId);
       }
     )
     .subscribe();
@@ -852,7 +935,7 @@ async function fazerPedido() {
       // Esta aba estava numa sessão que acabou de encerrar (ver
       // mostrarContaFechada). O carrinho fica como está; só um re-scan do
       // QR libera o cardápio de novo.
-      mostrarContaFechada();
+      mostrarContaFechada(sessaoId);
       return;
     }
 
@@ -1072,7 +1155,7 @@ async function abrirModalFecharConta(mesa) {
 
     if (ehErroSessaoEncerrada(erro)) {
       fecharModalFecharConta();
-      mostrarContaFechada();
+      mostrarContaFechada(sessaoId);
       return;
     }
 
@@ -1163,7 +1246,7 @@ async function confirmarFecharConta() {
 
     if (ehErroSessaoEncerrada(erro)) {
       fecharModalFecharConta();
-      mostrarContaFechada();
+      mostrarContaFechada(sessaoId);
       return;
     }
 
