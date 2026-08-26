@@ -375,6 +375,12 @@ function ehErroSessaoEncerrada(erro) {
   return Boolean(erro) && erro.details === 'SESSAO_ENCERRADA';
 }
 
+// Idem, pra recusa "MESA_BLOQUEADA" (ver supabase/019_bloqueio_mesa.sql) —
+// mesa com fechamento total ainda não liberada pelo garçom.
+function ehErroMesaBloqueada(erro) {
+  return Boolean(erro) && erro.details === 'MESA_BLOQUEADA';
+}
+
 const contaEncerradaOverlay = document.getElementById('contaEncerradaOverlay');
 const contaEncerradaModal = document.getElementById('contaEncerradaModal');
 const contaEncerradaTitulo = document.getElementById('contaEncerradaTitulo');
@@ -390,11 +396,15 @@ const iniciarPedidoBtn = document.getElementById('iniciarPedidoBtn');
 // conta" ela não vale nada) enquanto a tela mostra a confirmação.
 let sessaoPendente = null;
 
-// Trava a tela reaproveitando o mesmo modal pros três estados (ver
-// index.html) — limpa qualquer sessão CONFIRMADA guardada, pra não restar
-// estado que permita burlar a trava numa próxima checagem. "botoes" é a
-// lista de ids a mostrar: 'cancelar', 'entrar', 'iniciar', ou [] pra nenhum.
+// Trava a tela reaproveitando o mesmo modal pros estados (ver index.html) —
+// limpa qualquer sessão CONFIRMADA guardada, pra não restar estado que
+// permita burlar a trava numa próxima checagem. "botoes" é a lista de ids a
+// mostrar: 'cancelar', 'entrar', 'iniciar', ou [] pra nenhum. Sempre para o
+// polling de "Mesa aguardando liberação" (ver pararPollingMesaBloqueada) —
+// se este travarTela for justamente pra mostrar aquela tela de novo,
+// mostrarMesaBloqueada reinicia o polling logo em seguida.
 function travarTela(titulo, texto, botoes) {
+  pararPollingMesaBloqueada();
   salvarSessao(null, null);
   contaEncerradaTitulo.textContent = titulo;
   contaEncerradaTexto.textContent = texto;
@@ -415,6 +425,60 @@ function mostrarAcessoBloqueado() {
     'Se você acabou de sentar, escaneie o QR code da mesa novamente para começar um novo pedido.',
     []
   );
+}
+
+// Intervalo do polling da tela "Mesa aguardando liberação" (ver
+// mostrarMesaBloqueada) — guardado fora da função pra travarTela/
+// destravarTela conseguirem parar de qualquer lugar (pararPollingMesaBloqueada).
+let pollingMesaBloqueadaId = null;
+
+function pararPollingMesaBloqueada() {
+  if (pollingMesaBloqueadaId) {
+    clearInterval(pollingMesaBloqueadaId);
+    pollingMesaBloqueadaId = null;
+  }
+}
+
+// Mesa+token da mesa válidos, sem sessão aberta pra essa mesa AGORA, e a
+// MESA (não a sessão) está bloqueada (ver supabase/019_bloqueio_mesa.sql —
+// status_mesa='bloqueada', setado sozinho no fechamento total, só um
+// garçom libera de novo via liberar_mesa). Sem botão: a pessoa não tem
+// nenhuma ação que resolva isso sozinha, só chamar quem trabalha no bar.
+// Faz polling de status_da_mesa (RPC leve, sem segredo — nunca Realtime
+// direto em "mesas", que exporia o token de todas as mesas, ver comentário
+// no fim de 019_bloqueio_mesa.sql) pra destravar sozinha assim que o
+// garçom liberar, sem precisar a pessoa dar F5.
+function mostrarMesaBloqueada() {
+  sessaoPendente = null;
+  travarTela(
+    'Mesa aguardando liberação',
+    'Chame um atendente para liberar o pedido nesta mesa.',
+    []
+  );
+
+  pollingMesaBloqueadaId = setInterval(async () => {
+    const mesaValor = mesaAtualValor();
+    if (!mesaValor) return;
+
+    try {
+      const { data: status, error } = await supabase.rpc('status_da_mesa', {
+        p_mesa: Number(mesaValor),
+        p_token: tokenMesa,
+      });
+      if (error) throw error;
+
+      if (status === 'liberada') {
+        // Não chama mostrarBoasVindas direto: reconfere tudo do zero (pode
+        // ter sido liberada E já ter alguém com sessão aberta nela, etc.).
+        pararPollingMesaBloqueada();
+        atualizarEstadoSessao();
+      }
+    } catch (erro) {
+      // Erro de rede pontual no polling não é motivo pra travar mais forte
+      // nem pra destravar — só tenta de novo no próximo tick.
+      console.error('Erro ao checar liberação da mesa:', erro);
+    }
+  }, 8000);
 }
 
 // Mesa+token da mesa válidos, sem sessão aberta pra essa mesa AGORA, e ESTE
@@ -459,8 +523,34 @@ function mostrarContaFechada(sessaoIdEncerrada) {
 //     a aba, cobre o F5-equivalente de abrir uma aba nova com a mesma URL.
 // Havendo qualquer uma das duas, é porque este aparelho estava numa sessão
 // que não existe mais — CASO B. Sem nenhuma, mesa nova/cliente novo — CASO A.
-function mostrarSemSessaoOuEncerrada(guardada) {
-  const marca = lerContaEncerrada(mesaAtualValor());
+// ANTES de decidir entre as duas, checa status_da_mesa (supabase/
+// 019_bloqueio_mesa.sql): mesa 'bloqueada' manda pra mostrarMesaBloqueada
+// sempre, independente de guardada/marca — o bloqueio de mesa é mais forte
+// que "cliente novo" ou "conta encerrada" (nenhum dos dois libera cardápio
+// numa mesa que o garçom ainda não confirmou estar ocupada de verdade).
+async function mostrarSemSessaoOuEncerrada(guardada) {
+  const mesaValor = mesaAtualValor();
+
+  try {
+    const { data: statusMesa, error } = await supabase.rpc('status_da_mesa', {
+      p_mesa: Number(mesaValor),
+      p_token: tokenMesa,
+    });
+    if (error) throw error;
+
+    if (statusMesa === 'bloqueada') {
+      console.log('[sessao] mesa bloqueada -> mostrando MESA AGUARDANDO LIBERAÇÃO');
+      mostrarMesaBloqueada();
+      return;
+    }
+  } catch (erro) {
+    // Sem confirmar o status da mesa, não dá pra saber se está liberada —
+    // por segurança (regra 1), segue pra decisão normal abaixo em vez de
+    // arriscar liberar Boas-vindas numa mesa que pode estar bloqueada.
+    console.error('Erro ao consultar status da mesa:', erro);
+  }
+
+  const marca = lerContaEncerrada(mesaValor);
   const sessaoIdEncerrada = (guardada && guardada.sessaoId) || (marca && marca.session_id) || null;
   console.log(
     '[sessao] sem sessão aberta — guardada (sessionStorage):', guardada,
@@ -493,6 +583,7 @@ function mostrarConfirmarEntrada(sessao) {
 }
 
 function destravarTela() {
+  pararPollingMesaBloqueada();
   contaEncerradaOverlay.classList.remove('is-open');
   contaEncerradaModal.classList.remove('is-open');
 }
@@ -561,7 +652,7 @@ async function atualizarEstadoSessao() {
     if (error) throw error;
 
     if (!data) {
-      mostrarSemSessaoOuEncerrada(guardada);
+      await mostrarSemSessaoOuEncerrada(guardada);
       return;
     }
 
@@ -581,7 +672,7 @@ async function atualizarEstadoSessao() {
     // trava em vez de liberar o cardápio otimisticamente (regra 1). O botão
     // de "Iniciar pedido" (quando aparece) também serve pra tentar de novo
     // nesse caso.
-    mostrarSemSessaoOuEncerrada(guardada);
+    await mostrarSemSessaoOuEncerrada(guardada);
   }
 }
 
@@ -602,6 +693,14 @@ async function abrirNovoPedido() {
     aposEntrarNaSessao();
   } catch (erro) {
     console.error('Erro ao abrir novo pedido:', erro);
+
+    if (ehErroMesaBloqueada(erro)) {
+      // Corrida rara: a mesa foi bloqueada entre a checagem de status_da_mesa
+      // e o toque em "Iniciar pedido" (ver supabase/019_bloqueio_mesa.sql).
+      mostrarMesaBloqueada();
+      return;
+    }
+
     mostrarToast(erro.message || 'Não foi possível iniciar o pedido agora. Verifique sua conexão e tente de novo.');
   } finally {
     iniciarPedidoBtn.disabled = false;
@@ -936,6 +1035,14 @@ async function fazerPedido() {
       // mostrarContaFechada). O carrinho fica como está; só um re-scan do
       // QR libera o cardápio de novo.
       mostrarContaFechada(sessaoId);
+      return;
+    }
+
+    if (ehErroMesaBloqueada(erro)) {
+      // Defesa a mais (ver supabase/019_bloqueio_mesa.sql): na prática não
+      // deveria acontecer, já que uma mesa bloqueada não tem sessão aberta
+      // (então cairia em SESSAO_ENCERRADA acima primeiro).
+      mostrarMesaBloqueada();
       return;
     }
 

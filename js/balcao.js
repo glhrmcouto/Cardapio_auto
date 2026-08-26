@@ -36,6 +36,8 @@ const fechamentoGrid = document.getElementById('fechamentoGrid');
 const pagamentoGrid = document.getElementById('pagamentoGrid');
 const mesasAtivasGrid = document.getElementById('mesasAtivasGrid');
 const mesasAtivasVazio = document.getElementById('mesasAtivasVazio');
+const controleMesasGrid = document.getElementById('controleMesasGrid');
+const controleMesasVazio = document.getElementById('controleMesasVazio');
 
 const historicoBtn = document.getElementById('historicoBtn');
 const historicoOverlay = document.getElementById('historicoOverlay');
@@ -71,6 +73,7 @@ let pedidos = []; // só os pedidos com status "pendente" — cada um já vem co
 let fechamentos = []; // pedidos de "fechar conta" (mesa inteira) ainda não atendidos
 let pagamentosPendentes = []; // pagamentos parciais ("fechar minha parte") ainda não confirmados
 let mesasAtivas = []; // sessões com status "aberta" — uma por mesa ocupada agora
+let mesasControle = []; // TODAS as mesas ({numero, status_mesa, ativa}) — ver listar_mesas_balcao
 
 function formatarHorario(iso) {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -405,6 +408,18 @@ async function carregarMesasAtivas() {
   mesasAtivas = data;
 }
 
+// Lista TODAS as mesas (não só as com sessão aberta) via RPC — nunca
+// consulta a tabela "mesas" direto: RLS restringe o SELECT direto a admin
+// de propósito (o token é secreto, ver 005_seguranca.sql), e balcao.html
+// aceita qualquer conta autenticada, não só admin. A RPC listar_mesas_balcao
+// (ver supabase/019_bloqueio_mesa.sql) devolve só número/status_mesa/ativa,
+// nunca o token.
+async function carregarMesasControle() {
+  const { data, error } = await supabase.rpc('listar_mesas_balcao');
+  if (error) throw error;
+  mesasControle = data;
+}
+
 async function carregarTudoInicial() {
   balcaoErroEl.style.display = 'none';
 
@@ -414,6 +429,7 @@ async function carregarTudoInicial() {
       carregarFechamentosPendentes(),
       carregarPagamentosPendentes(),
       carregarMesasAtivas(),
+      carregarMesasControle(),
     ]);
   } catch (erro) {
     console.error('Erro ao carregar pedidos/fechamentos:', erro);
@@ -421,6 +437,7 @@ async function carregarTudoInicial() {
     fechamentoGrid.innerHTML = '';
     pagamentoGrid.innerHTML = '';
     mesasAtivasGrid.innerHTML = '';
+    controleMesasGrid.innerHTML = '';
     balcaoVazio.style.display = 'none';
     balcaoErroEl.style.display = 'block';
     return;
@@ -430,6 +447,7 @@ async function carregarTudoInicial() {
   await renderizarPagamentosPendentes();
   await renderizarFechamentos();
   await renderizarMesasAtivas();
+  renderizarControleMesas();
 }
 
 balcaoTentarBtn.addEventListener('click', carregarTudoInicial);
@@ -694,6 +712,9 @@ async function finalizarFechamento(id) {
   renderizarPedidos();
   await renderizarFechamentos();
   await renderizarMesasAtivas();
+  // encerrar_sessao (dentro de tentarEncerrarSessao) já bloqueou a mesa
+  // sozinha no banco — ver supabase/019_bloqueio_mesa.sql.
+  atualizarMesaControleLocal(fechamento.mesa, 'bloqueada');
 }
 
 fechamentoGrid.addEventListener('click', (event) => {
@@ -779,6 +800,9 @@ async function confirmarRecebimentoPagamento(id) {
     mesasAtivas = mesasAtivas.filter(s => String(s.mesa) !== String(data.mesa));
     renderizarPedidos();
     mostrarToast(`Mesa ${data.mesa} quitada e encerrada automaticamente.`);
+    // confirmar_pagamento já bloqueou a mesa sozinha no banco quando
+    // encerrou a sessão (ver supabase/019_bloqueio_mesa.sql).
+    atualizarMesaControleLocal(data.mesa, 'bloqueada');
   }
 
   await renderizarPagamentosPendentes();
@@ -878,6 +902,7 @@ async function fecharMesaDireto(mesa, botao) {
   renderizarPedidos();
   await renderizarFechamentos();
   await renderizarMesasAtivas();
+  atualizarMesaControleLocal(mesa, 'bloqueada');
 }
 
 mesasAtivasGrid.addEventListener('click', (event) => {
@@ -885,6 +910,81 @@ mesasAtivasGrid.addEventListener('click', (event) => {
   if (!botao) return;
   const mesa = botao.dataset.mesa;
   pedirConfirmacaoSenha(() => fecharMesaDireto(mesa, botao));
+});
+
+// ========================================
+// CONTROLE DE MESAS (liberação pós-fechamento)
+// ========================================
+//
+// Toda mesa passa a ter status_mesa (liberada/bloqueada — ver
+// supabase/019_bloqueio_mesa.sql). Um fechamento total (finalizarFechamento,
+// fecharMesaDireto ou o encerramento automático em
+// confirmarRecebimentoPagamento) bloqueia a mesa sozinho, no banco — aqui só
+// refletimos isso na tela na hora, sem esperar recarregar. liberar_mesa é o
+// único caminho de volta pra 'liberada', sempre sob toque explícito do
+// garçom confirmando que tem gente sentada de verdade.
+
+function renderizarControleMesas() {
+  const mesas = mesasControle.filter(m => m.ativa);
+
+  if (mesas.length === 0) {
+    controleMesasVazio.style.display = 'block';
+    controleMesasGrid.innerHTML = '';
+    return;
+  }
+
+  controleMesasVazio.style.display = 'none';
+
+  controleMesasGrid.innerHTML = mesas.map(mesa => {
+    const bloqueada = mesa.status_mesa === 'bloqueada';
+    const temSessaoAberta = mesasAtivas.some(s => String(s.mesa) === String(mesa.numero));
+
+    return `
+    <div class="controle-mesa-card${bloqueada ? ' controle-mesa-card--bloqueada' : ''}" data-mesa="${mesa.numero}">
+      <div class="controle-mesa-card__mesa">Mesa ${mesa.numero}</div>
+      <span class="controle-mesa-card__status controle-mesa-card__status--${mesa.status_mesa}">${bloqueada ? 'Bloqueada' : 'Liberada'}</span>
+      ${temSessaoAberta ? '<span class="controle-mesa-card__sessao">Sessão aberta</span>' : ''}
+      ${bloqueada ? `<button type="button" class="btn btn--primary controle-mesa-card__liberar" data-mesa="${mesa.numero}">Liberar mesa</button>` : ''}
+    </div>
+  `;
+  }).join('');
+}
+
+// Atualiza o status de UMA mesa em mesasControle (sem precisar recarregar
+// listar_mesas_balcao inteira) e redesenha — usado tanto pelas ações locais
+// (liberar_mesa, os três caminhos de fechamento total) quanto pelo evento
+// de Realtime de outro aparelho (ver lidarComAtualizacaoSessao).
+function atualizarMesaControleLocal(mesa, novoStatus) {
+  const entrada = mesasControle.find(m => String(m.numero) === String(mesa));
+  if (entrada) entrada.status_mesa = novoStatus;
+  renderizarControleMesas();
+}
+
+async function liberarMesa(mesa, botao) {
+  if (botao) {
+    botao.disabled = true;
+    botao.textContent = 'Liberando...';
+  }
+
+  const { error } = await supabase.rpc('liberar_mesa', { p_mesa: Number(mesa) });
+
+  if (error) {
+    console.error('Erro ao liberar mesa:', error);
+    alert('Não foi possível liberar a mesa agora. Verifique sua conexão e tente de novo.');
+    if (botao) {
+      botao.disabled = false;
+      botao.textContent = 'Liberar mesa';
+    }
+    return;
+  }
+
+  atualizarMesaControleLocal(mesa, 'liberada');
+}
+
+controleMesasGrid.addEventListener('click', (event) => {
+  const botao = event.target.closest('.controle-mesa-card__liberar');
+  if (!botao) return;
+  liberarMesa(botao.dataset.mesa, botao);
 });
 
 // ========================================
@@ -990,6 +1090,13 @@ function lidarComAtualizacaoSessao(payload) {
   if (atualizado.status !== 'aberta' && mesasAtivas.some(s => s.id === atualizado.id)) {
     mesasAtivas = mesasAtivas.filter(s => s.id !== atualizado.id);
     renderizarMesasAtivas();
+    // "mesas" não está no Realtime (o token é secreto — ver comentário no
+    // fim de supabase/019_bloqueio_mesa.sql), então é este evento de
+    // "sessoes" fechando que avisa o Controle de Mesas em OUTRO
+    // aparelho/aba que acabou de bloquear — encerrar_sessao e
+    // confirmar_pagamento sempre bloqueiam a mesa na mesma transação em
+    // que fecham a sessão.
+    atualizarMesaControleLocal(atualizado.mesa, 'bloqueada');
   }
 }
 

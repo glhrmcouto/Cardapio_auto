@@ -471,6 +471,73 @@
   padding: 0.55rem 1.4rem;
 }
 
+/* ========================================
+   CONTROLE DE MESAS (liberação pós-fechamento)
+   Card pequeno e denso — uma grade cabe muitas mesas na tela. Bloqueada
+   fica destacada (borda/fundo vermelhos, mesmo tom de fechamento-card)
+   pra chamar atenção do garçom; liberada fica discreta.
+======================================== */
+.controle-mesas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.controle-mesa-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--preto-2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 4px solid rgba(107, 217, 122, 0.6);
+  border-radius: 12px;
+}
+
+.controle-mesa-card--bloqueada {
+  border-left-color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.08);
+}
+
+.controle-mesa-card__mesa {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: var(--laranja-forte);
+}
+
+.controle-mesa-card__status {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 0.2rem 0.6rem;
+  border-radius: 50px;
+}
+
+.controle-mesa-card__status--liberada {
+  color: #6bd97a;
+  background: rgba(107, 217, 122, 0.15);
+}
+
+.controle-mesa-card__status--bloqueada {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.15);
+}
+
+.controle-mesa-card__sessao {
+  font-size: 0.75rem;
+  color: var(--cinza-claro);
+}
+
+.controle-mesa-card__liberar {
+  align-self: stretch;
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+}
+
 /*MODAL: HISTÓRICO DE PEDIDOS*/
 .modal-panel--historico {
   width: min(560px, 92vw);

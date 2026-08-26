@@ -74,6 +74,18 @@
       <div class="mesas-ativas-grid" id="mesasAtivasGrid">
         <!-- Cards de mesa ativa (itens + subtotal/serviço/total/saldo) gerados via JS -->
       </div>
+
+      <!-- ===== CONTROLE DE MESAS (liberação pós-fechamento) =====
+           Toda mesa, com status_mesa (liberada/bloqueada — ver
+           supabase/019_bloqueio_mesa.sql). Depois de um fechamento total, a
+           mesa vira "bloqueada" sozinha: o cliente não consegue iniciar
+           pedido novo até um garçom confirmar que tem gente sentada de
+           verdade e tocar "Liberar mesa" aqui. -->
+      <h2 class="balcao-secao-titulo">Controle de Mesas</h2>
+      <p class="balcao-vazio" id="controleMesasVazio" style="display: none;">Nenhuma mesa cadastrada.</p>
+      <div class="controle-mesas-grid" id="controleMesasGrid">
+        <!-- Cards de controle de mesa (número + status + botão Liberar mesa) gerados via JS -->
+      </div>
     </main>
 
     <!-- ===== MODAL: HISTÓRICO DE PEDIDOS ===== -->
