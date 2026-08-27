@@ -38,6 +38,7 @@
       <nav class="nav container">
         <span class="nav__logo">AOOBA! <span class="admin-header__tag">— Administrador</span></span>
         <div class="admin-header__acoes">
+          <a class="btn btn--secondary admin-header__sair" href="mesas.html">Mesas</a>
           <a class="btn btn--secondary admin-header__sair" href="relatorios.html">Relatórios</a>
           <a class="btn btn--secondary admin-header__sair" href="gerar-qrcodes.html">QR codes</a>
           <button class="btn btn--secondary admin-header__sair" id="sairBtn">Sair</button>
@@ -61,7 +62,7 @@
       <div id="categoriasContainer"></div>
 
       <div class="admin-toolbar">
-        <h1 class="admin-titulo">Configurações</h1>
+        <h1 class="admin-titulo">Taxa de serviço</h1>
       </div>
 
       <p class="cardapio-status" id="configCarregando">Carregando configurações...</p>
@@ -79,22 +80,6 @@
         <button type="submit" class="btn btn--primary">Salvar</button>
         <p class="admin-produto-card__feedback" id="configFeedback" role="status"></p>
       </form>
-
-      <div class="admin-toolbar admin-toolbar--mesas">
-        <h1 class="admin-titulo">Mesas</h1>
-        <form class="admin-mesa-nova" id="novaMesaForm">
-          <input type="number" id="novaMesaNumero" min="1" placeholder="Nº da mesa" required>
-          <button type="submit" class="btn btn--primary">+ Adicionar mesa</button>
-        </form>
-      </div>
-
-      <p class="cardapio-status" id="mesasCarregando">Carregando mesas...</p>
-      <div class="cardapio-status cardapio-status--erro" id="mesasErro" style="display: none;">
-        <p>Não foi possível carregar as mesas agora. Verifique sua conexão e tente de novo.</p>
-        <button type="button" class="btn btn--secondary" id="mesasTentar">Tentar novamente</button>
-      </div>
-
-      <div class="admin-mesas-grid" id="mesasContainer"></div>
     </main>
 
   </div>
