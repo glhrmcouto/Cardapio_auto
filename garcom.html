@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <!-- viewport igual ao resto do site, mas esta tela é MOBILE-FIRST de
+       verdade: o garçom usa no celular, andando pelo salão — o layout base
+       (sem media query) já é o de tela pequena; ver css/garcom.css. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <title>AOOBA! — Garçom</title>
+  <meta name="description" content="Painel do garçom do AOOBA! BAR — mesas, pedidos e lançamento direto no salão.">
+  <meta name="theme-color" content="#0d0d0d">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/svg+xml" href="img/aooba_bar_fundo_escuro.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/balcao.css">
+  <link rel="stylesheet" href="css/garcom.css">
+</head>
+<body>
+
+  <!-- ===== LOGIN (nada aparece sem sessão autenticada E com papel
+       garcom/balcao/admin — ver supabase/023_papel_garcom.sql) ===== -->
+  <div class="login-tela" id="loginTela">
+    <form class="login-card" id="loginForm" novalidate>
+      <h1 class="login-card__titulo">AOOBA! <span>— Garçom</span></h1>
+      <label for="loginEmail">E-mail</label>
+      <input type="email" id="loginEmail" autocomplete="username" required>
+      <label for="loginSenha">Senha</label>
+      <input type="password" id="loginSenha" autocomplete="current-password" required>
+      <p class="login-card__erro" id="loginErro" role="alert" style="display: none;"></p>
+      <button type="submit" class="btn btn--primary login-card__entrar" id="loginEntrarBtn">Entrar</button>
+    </form>
+  </div>
+
+  <!-- ===== CONTEÚDO DO GARÇOM (só aparece logado E com papel liberado) ===== -->
+  <div id="garcomConteudo" style="display: none;">
+
+    <!-- Header enxuto — sem os indicadores de conexão/som/contador do
+         balcão (tela grande, fica ligada num PC); aqui o essencial é
+         título + sair, o resto do espaço é da tela pequena. -->
+    <header class="header garcom-header">
+      <nav class="nav container garcom-header__nav">
+        <span class="nav__logo">AOOBA! <span class="garcom-header__tag">— Garçom</span></span>
+        <button class="btn btn--secondary garcom-header__sair" id="sairBtn">Sair</button>
+      </nav>
+    </header>
+
+    <!-- ===== ABAS (Mesas / Pedidos) =====
+         Nav de abas fixa embaixo, alcance de polegar num celular — padrão
+         comum de app mobile, diferente do topo usado nas telas de PC
+         (admin/balcão/relatórios). -->
+    <main class="garcom-main">
+      <section class="garcom-aba" id="abaMesas" data-aba="mesas">
+        <!-- Ações em massa — mesmas RPCs de supabase/022_mesas_em_massa.sql
+             já usadas no painel "Controle de Mesas" do balcão (balcao.js);
+             reaproveitadas aqui, não recriadas. -->
+        <div class="controle-mesas-massa">
+          <button type="button" class="btn btn--secondary" id="liberarTodasBtn">Liberar todas</button>
+          <button type="button" class="btn btn--secondary" id="bloquearTodasBtn">Bloquear todas</button>
+        </div>
+
+        <p class="cardapio-status" id="mesasCarregando">Carregando mesas...</p>
+        <div class="cardapio-status cardapio-status--erro" id="mesasErro" style="display: none;">
+          <p>Não foi possível carregar as mesas agora. Verifique sua conexão e tente de novo.</p>
+          <button type="button" class="btn btn--secondary" id="mesasTentar">Tentar novamente</button>
+        </div>
+        <p class="modal-panel__vazio" id="mesasVazio" style="display: none;">Nenhuma mesa cadastrada.</p>
+
+        <!-- Cards no mesmo componente visual de .controle-mesa-card
+             (css/balcao.css) — número + status + ações, gerados via JS. -->
+        <div class="controle-mesas-grid" id="mesasGrid"></div>
+      </section>
+
+      <section class="garcom-aba" id="abaPedidos" data-aba="pedidos" hidden>
+        <p class="cardapio-status" id="pedidosCarregando">Carregando pedidos...</p>
+        <div class="cardapio-status cardapio-status--erro" id="pedidosErro" style="display: none;">
+          <p>Não foi possível carregar os pedidos agora. Verifique sua conexão e tente de novo.</p>
+          <button type="button" class="btn btn--secondary" id="pedidosTentar">Tentar novamente</button>
+        </div>
+        <p class="balcao-vazio" id="pedidosVazio" style="display: none;">Nenhum pedido pendente no momento.</p>
+
+        <!-- Mesmo componente visual .pedido-card de balcao.css — mesa,
+             cliente, horário, itens, total e o botão "Entregue", gerados
+             via JS. Sem o botão de remover item (fica só no balcão: essa
+             tela é enxuta de propósito, ver Etapa 3). -->
+        <div class="balcao-grid" id="pedidosGrid"></div>
+      </section>
+    </main>
+
+    <nav class="garcom-tabbar" aria-label="Navegação principal">
+      <button type="button" class="garcom-tabbar__item is-ativo" id="tabMesasBtn" data-aba="mesas" aria-current="page">
+        <span class="garcom-tabbar__label">Mesas</span>
+      </button>
+      <button type="button" class="garcom-tabbar__item" id="tabPedidosBtn" data-aba="pedidos">
+        <span class="garcom-tabbar__label">Pedidos</span>
+        <span class="garcom-tabbar__badge" id="pedidosBadge" hidden>0</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- Toast de aviso discreto — mesma classe .toast de css/style.css,
+       usada em index.html/balcao.html. -->
+  <div class="toast" id="toast"></div>
+
+  <script type="module" src="js/garcom.js"></script>
+</body>
+</html>
