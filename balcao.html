@@ -44,6 +44,7 @@
           <span class="balcao-header__contador">Pedidos pendentes: <strong id="contadorPedidos">0</strong></span>
           <button class="btn btn--secondary balcao-header__som" id="ativarSomBtn" aria-pressed="false">🔔 Ativar som</button>
           <button class="btn btn--secondary balcao-header__historico" id="historicoBtn">Histórico</button>
+          <button class="btn btn--secondary balcao-header__historico" id="controleMesasBtn">Mesas</button>
           <button class="btn btn--secondary balcao-header__sair" id="sairBtn">Sair</button>
         </div>
       </nav>
@@ -75,17 +76,6 @@
         <!-- Cards de mesa ativa (itens + subtotal/serviço/total/saldo) gerados via JS -->
       </div>
 
-      <!-- ===== CONTROLE DE MESAS (liberação pós-fechamento) =====
-           Toda mesa, com status_mesa (liberada/bloqueada — ver
-           supabase/019_bloqueio_mesa.sql). Depois de um fechamento total, a
-           mesa vira "bloqueada" sozinha: o cliente não consegue iniciar
-           pedido novo até um garçom confirmar que tem gente sentada de
-           verdade e tocar "Liberar mesa" aqui. -->
-      <h2 class="balcao-secao-titulo">Controle de Mesas</h2>
-      <p class="balcao-vazio" id="controleMesasVazio" style="display: none;">Nenhuma mesa cadastrada.</p>
-      <div class="controle-mesas-grid" id="controleMesasGrid">
-        <!-- Cards de controle de mesa (número + status + botão Liberar mesa) gerados via JS -->
-      </div>
     </main>
 
     <!-- ===== MODAL: HISTÓRICO DE PEDIDOS ===== -->
@@ -102,6 +92,32 @@
       </div>
       <p class="modal-panel__vazio" id="historicoVazio">Nenhum pedido registrado ainda.</p>
       <div class="modal-panel__itens" id="historicoLista"></div>
+    </div>
+
+    <!-- ===== MODAL: CONTROLE DE MESAS (liberação pós-fechamento) =====
+         Toda mesa, com status_mesa (liberada/bloqueada — ver
+         supabase/019_bloqueio_mesa.sql). Depois de um fechamento total, a
+         mesa vira "bloqueada" sozinha: o cliente não consegue iniciar pedido
+         novo até um garçom confirmar que tem gente sentada de verdade e
+         tocar "Liberar mesa" aqui. Virou modal (igual Histórico) pra não
+         deixar a tela do balcão comprida. -->
+    <div class="modal-overlay" id="controleMesasOverlay"></div>
+    <div class="modal-panel modal-panel--controle-mesas" id="controleMesasModal" role="dialog" aria-modal="true" aria-labelledby="controleMesasTitulo">
+      <div class="modal-panel__header">
+        <span class="modal-panel__title" id="controleMesasTitulo">Controle de Mesas</span>
+        <button class="modal-panel__close" id="controleMesasClose" aria-label="Fechar">&times;</button>
+      </div>
+      <!-- Ações em massa (abertura/fechamento do salão) — ver
+           supabase/022_mesas_em_massa.sql. "Bloquear todas" pode pedir uma
+           segunda confirmação (forçar) se houver mesa com conta aberta. -->
+      <div class="controle-mesas-massa">
+        <button type="button" class="btn btn--secondary" id="liberarTodasBtn">Liberar todas</button>
+        <button type="button" class="btn btn--secondary" id="bloquearTodasBtn">Bloquear todas</button>
+      </div>
+      <p class="modal-panel__vazio" id="controleMesasVazio" style="display: none;">Nenhuma mesa cadastrada.</p>
+      <div class="controle-mesas-grid" id="controleMesasGrid">
+        <!-- Cards de controle de mesa (número + status + botão Liberar mesa) gerados via JS -->
+      </div>
     </div>
 
     <!-- ===== MODAL: CONFIRMAR SENHA (ações sensíveis: remover item, fechar mesa) =====

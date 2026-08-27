@@ -501,6 +501,12 @@
   background: rgba(255, 107, 107, 0.08);
 }
 
+.controle-mesa-card--inativa {
+  border-left-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.03);
+  opacity: 0.75;
+}
+
 .controle-mesa-card__mesa {
   font-family: var(--fonte-titulo);
   font-weight: 700;
@@ -527,6 +533,11 @@
   background: rgba(255, 107, 107, 0.15);
 }
 
+.controle-mesa-card__status--inativa {
+  color: var(--cinza-claro);
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .controle-mesa-card__sessao {
   font-size: 0.75rem;
   color: var(--cinza-claro);
@@ -538,9 +549,51 @@
   padding: 0.5rem 1rem;
 }
 
+.controle-mesa-card__desativar {
+  align-self: stretch;
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+}
+
+.controle-mesa-card__ativar {
+  align-self: stretch;
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+}
+
 /*MODAL: HISTÓRICO DE PEDIDOS*/
 .modal-panel--historico {
   width: min(560px, 92vw);
+}
+
+/*MODAL: CONTROLE DE MESAS*/
+.modal-panel--controle-mesas {
+  width: min(700px, 92vw);
+}
+
+.controle-mesas-massa {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.controle-mesas-massa .btn {
+  flex: 1;
+  font-size: 0.85rem;
+  padding: 0.6rem 1rem;
+}
+
+/* Grade rolável dentro do max-height do modal (mesmo esquema de
+   .modal-panel__itens em style.css) — sem isso os cards empurram o modal
+   inteiro pra baixo do topo (max-height sem overflow constrói uma caixa
+   "vazando" em vez de rolar por dentro). */
+.modal-panel--controle-mesas .controle-mesas-grid {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 0.6rem;
+  margin-right: -0.6rem;
+  margin-bottom: 0;
 }
 
 .historico-pedido {

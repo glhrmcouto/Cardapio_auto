@@ -39,6 +39,13 @@ const mesasAtivasVazio = document.getElementById('mesasAtivasVazio');
 const controleMesasGrid = document.getElementById('controleMesasGrid');
 const controleMesasVazio = document.getElementById('controleMesasVazio');
 
+const controleMesasBtn = document.getElementById('controleMesasBtn');
+const controleMesasOverlay = document.getElementById('controleMesasOverlay');
+const controleMesasModal = document.getElementById('controleMesasModal');
+const controleMesasClose = document.getElementById('controleMesasClose');
+const liberarTodasBtn = document.getElementById('liberarTodasBtn');
+const bloquearTodasBtn = document.getElementById('bloquearTodasBtn');
+
 const historicoBtn = document.getElementById('historicoBtn');
 const historicoOverlay = document.getElementById('historicoOverlay');
 const historicoModal = document.getElementById('historicoModal');
@@ -74,6 +81,16 @@ let fechamentos = []; // pedidos de "fechar conta" (mesa inteira) ainda não ate
 let pagamentosPendentes = []; // pagamentos parciais ("fechar minha parte") ainda não confirmados
 let mesasAtivas = []; // sessões com status "aberta" — uma por mesa ocupada agora
 let mesasControle = []; // TODAS as mesas ({numero, status_mesa, ativa}) — ver listar_mesas_balcao
+
+// Precisam estar declaradas AQUI (antes do "await" inicial de sessão lá
+// embaixo) e não perto do resto do código de polling — senão
+// iniciarPollingMesas() (chamado de dentro de mostrarTelaLogada, disparado
+// por esse await) tenta usá-las antes de a própria declaração "let"/"const"
+// rodar (zona morta temporal) e quebra silenciosamente, sem nenhum erro
+// visível na tela — foi exatamente esse bug. Ver mesmo cuidado em
+// js/garcom.js (lá a solução foi mover o await pro fim do arquivo).
+const INTERVALO_POLL_MESAS = 5000;
+let pollMesasIntervalId = null;
 
 function formatarHorario(iso) {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -114,6 +131,7 @@ async function mostrarTelaLogada() {
 
   await carregarTudoInicial();
   inscreverRealtime();
+  iniciarPollingMesas();
 }
 
 loginForm.addEventListener('submit', async (event) => {
@@ -149,6 +167,7 @@ supabase.auth.onAuthStateChange((_evento, session) => {
     mostrarTelaLogada();
   } else {
     desinscreverRealtime();
+    pararPollingMesas();
     balcaoIniciado = false;
     pedidos = [];
     fechamentos = [];
@@ -920,12 +939,21 @@ mesasAtivasGrid.addEventListener('click', (event) => {
 // supabase/019_bloqueio_mesa.sql). Um fechamento total (finalizarFechamento,
 // fecharMesaDireto ou o encerramento automático em
 // confirmarRecebimentoPagamento) bloqueia a mesa sozinho, no banco — aqui só
-// refletimos isso na tela na hora, sem esperar recarregar. liberar_mesa é o
+// refletimos isso na tela na hora, sem esperar recarregar. Mudanças feitas
+// em OUTRO aparelho (outro balcão, ou garcom.html) chegam via o polling de
+// listar_mesas_balcao lá embaixo (ver POLLING DE MESAS) — "mesas" não tem
+// Realtime de propósito (token secreto). liberar_mesa é o
 // único caminho de volta pra 'liberada', sempre sob toque explícito do
 // garçom confirmando que tem gente sentada de verdade.
+//
+// Mostra TODAS as mesas, ativas ou não — inativa tem card simplificado (só
+// número + status + botão "Ativar mesa"), já que status_mesa/sessão não
+// importam pra uma mesa fora de circulação. Ativar/desativar aqui usa as
+// mesmas RPCs que admin.html teria via update direto (ver
+// supabase/020_ativar_desativar_mesa_balcao.sql) — as duas telas convivem.
 
 function renderizarControleMesas() {
-  const mesas = mesasControle.filter(m => m.ativa);
+  const mesas = mesasControle;
 
   if (mesas.length === 0) {
     controleMesasVazio.style.display = 'block';
@@ -936,6 +964,16 @@ function renderizarControleMesas() {
   controleMesasVazio.style.display = 'none';
 
   controleMesasGrid.innerHTML = mesas.map(mesa => {
+    if (!mesa.ativa) {
+      return `
+      <div class="controle-mesa-card controle-mesa-card--inativa" data-mesa="${mesa.numero}">
+        <div class="controle-mesa-card__mesa">Mesa ${mesa.numero}</div>
+        <span class="controle-mesa-card__status controle-mesa-card__status--inativa">Inativa</span>
+        <button type="button" class="btn btn--secondary controle-mesa-card__ativar" data-mesa="${mesa.numero}">Ativar mesa</button>
+      </div>
+    `;
+    }
+
     const bloqueada = mesa.status_mesa === 'bloqueada';
     const temSessaoAberta = mesasAtivas.some(s => String(s.mesa) === String(mesa.numero));
 
@@ -945,6 +983,7 @@ function renderizarControleMesas() {
       <span class="controle-mesa-card__status controle-mesa-card__status--${mesa.status_mesa}">${bloqueada ? 'Bloqueada' : 'Liberada'}</span>
       ${temSessaoAberta ? '<span class="controle-mesa-card__sessao">Sessão aberta</span>' : ''}
       ${bloqueada ? `<button type="button" class="btn btn--primary controle-mesa-card__liberar" data-mesa="${mesa.numero}">Liberar mesa</button>` : ''}
+      <button type="button" class="btn btn--secondary controle-mesa-card__desativar" data-mesa="${mesa.numero}">Desativar</button>
     </div>
   `;
   }).join('');
@@ -981,11 +1020,197 @@ async function liberarMesa(mesa, botao) {
   atualizarMesaControleLocal(mesa, 'liberada');
 }
 
+// Ativa/desativa a mesa (mesas.ativa) direto do balcão — mesmo efeito de
+// "Ativar"/"Desativar" em admin.html, só que sem precisar sair do balcão
+// (ver supabase/020_ativar_desativar_mesa_balcao.sql). As duas ações
+// convivem: o admin também pode continuar fazendo isso por lá.
+
+async function desativarMesa(mesa, botao) {
+  const confirmou = confirm(`Desativar a mesa ${mesa}? Ela some do cardápio pro cliente até alguém reativar.`);
+  if (!confirmou) return;
+
+  if (botao) {
+    botao.disabled = true;
+    botao.textContent = 'Desativando...';
+  }
+
+  const { error } = await supabase.rpc('desativar_mesa', { p_mesa: Number(mesa) });
+
+  if (error) {
+    console.error('Erro ao desativar mesa:', error);
+    alert('Não foi possível desativar a mesa agora. Verifique sua conexão e tente de novo.');
+    if (botao) {
+      botao.disabled = false;
+      botao.textContent = 'Desativar mesa';
+    }
+    return;
+  }
+
+  const entrada = mesasControle.find(m => String(m.numero) === String(mesa));
+  if (entrada) entrada.ativa = false;
+  renderizarControleMesas();
+}
+
+async function ativarMesa(mesa, botao) {
+  if (botao) {
+    botao.disabled = true;
+    botao.textContent = 'Ativando...';
+  }
+
+  const { error } = await supabase.rpc('ativar_mesa', { p_mesa: Number(mesa) });
+
+  if (error) {
+    console.error('Erro ao ativar mesa:', error);
+    alert('Não foi possível ativar a mesa agora. Verifique sua conexão e tente de novo.');
+    if (botao) {
+      botao.disabled = false;
+      botao.textContent = 'Ativar mesa';
+    }
+    return;
+  }
+
+  const entrada = mesasControle.find(m => String(m.numero) === String(mesa));
+  if (entrada) entrada.ativa = true;
+  renderizarControleMesas();
+}
+
 controleMesasGrid.addEventListener('click', (event) => {
-  const botao = event.target.closest('.controle-mesa-card__liberar');
-  if (!botao) return;
-  liberarMesa(botao.dataset.mesa, botao);
+  const botaoLiberar = event.target.closest('.controle-mesa-card__liberar');
+  if (botaoLiberar) {
+    liberarMesa(botaoLiberar.dataset.mesa, botaoLiberar);
+    return;
+  }
+
+  const botaoDesativar = event.target.closest('.controle-mesa-card__desativar');
+  if (botaoDesativar) {
+    desativarMesa(botaoDesativar.dataset.mesa, botaoDesativar);
+    return;
+  }
+
+  const botaoAtivar = event.target.closest('.controle-mesa-card__ativar');
+  if (botaoAtivar) {
+    ativarMesa(botaoAtivar.dataset.mesa, botaoAtivar);
+  }
 });
+
+// ========================================
+// AÇÕES EM MASSA (abertura/fechamento do salão) — ver
+// supabase/022_mesas_em_massa.sql
+// ========================================
+//
+// Depois de qualquer uma das duas, recarrega listar_mesas_balcao inteira em
+// vez de tentar adivinhar localmente quem mudou — mais simples e sempre
+// correto (as duas RPCs mexem em várias linhas de uma vez).
+
+async function liberarTodasMesas() {
+  const confirmou = confirm('Liberar todas as mesas para pedido?');
+  if (!confirmou) return;
+
+  liberarTodasBtn.disabled = true;
+
+  const { data: qtd, error } = await supabase.rpc('liberar_todas_mesas');
+
+  liberarTodasBtn.disabled = false;
+
+  if (error) {
+    console.error('Erro ao liberar todas as mesas:', error);
+    alert('Não foi possível liberar as mesas agora. Verifique sua conexão e tente de novo.');
+    return;
+  }
+
+  try {
+    await carregarMesasControle();
+  } catch (erro) {
+    console.error('Erro ao recarregar mesas depois de liberar todas:', erro);
+  }
+  renderizarControleMesas();
+  mostrarToast(`${qtd} ${qtd === 1 ? 'mesa liberada' : 'mesas liberadas'}.`);
+}
+
+// Chama bloquear_todas_mesas primeiro sem forçar; se sobrar mesa pulada por
+// ter conta aberta, avisa e só bloqueia essas também com uma SEGUNDA
+// confirmação explícita (p_forcar=true) — nunca interrompe conta em
+// andamento sem o operador saber exatamente o que está fazendo.
+async function bloquearTodasMesas() {
+  const confirmou = confirm('Bloquear todas as mesas?');
+  if (!confirmou) return;
+
+  bloquearTodasBtn.disabled = true;
+
+  const { data: resultado, error } = await supabase.rpc('bloquear_todas_mesas', { p_forcar: false });
+
+  if (error) {
+    console.error('Erro ao bloquear todas as mesas:', error);
+    bloquearTodasBtn.disabled = false;
+    alert('Não foi possível bloquear as mesas agora. Verifique sua conexão e tente de novo.');
+    return;
+  }
+
+  try {
+    await carregarMesasControle();
+  } catch (erro) {
+    console.error('Erro ao recarregar mesas depois de bloquear todas:', erro);
+  }
+  renderizarControleMesas();
+
+  const { bloqueadas, puladas } = resultado;
+
+  if (puladas === 0) {
+    bloquearTodasBtn.disabled = false;
+    mostrarToast(`${bloqueadas} ${bloqueadas === 1 ? 'mesa bloqueada' : 'mesas bloqueadas'}.`);
+    return;
+  }
+
+  const forcar = confirm(
+    `${bloqueadas} ${bloqueadas === 1 ? 'mesa foi bloqueada' : 'mesas foram bloqueadas'}. ` +
+    `${puladas} ${puladas === 1 ? 'mesa tem' : 'mesas têm'} conta aberta e NÃO ${puladas === 1 ? 'foi bloqueada' : 'foram bloqueadas'}. ` +
+    'Deseja bloquear essas também? (isso interrompe contas em andamento)'
+  );
+
+  if (!forcar) {
+    bloquearTodasBtn.disabled = false;
+    mostrarToast(`${bloqueadas} ${bloqueadas === 1 ? 'mesa bloqueada' : 'mesas bloqueadas'} — ${puladas} com conta aberta não ${puladas === 1 ? 'foi mexida' : 'foram mexidas'}.`);
+    return;
+  }
+
+  const { data: resultadoForcado, error: erroForcado } = await supabase.rpc('bloquear_todas_mesas', { p_forcar: true });
+
+  bloquearTodasBtn.disabled = false;
+
+  if (erroForcado) {
+    console.error('Erro ao forçar bloqueio de todas as mesas:', erroForcado);
+    alert('Não foi possível bloquear as mesas restantes agora. Verifique sua conexão e tente de novo.');
+    return;
+  }
+
+  try {
+    await carregarMesasControle();
+  } catch (erro) {
+    console.error('Erro ao recarregar mesas depois de forçar bloquear todas:', erro);
+  }
+  renderizarControleMesas();
+  mostrarToast(`${resultadoForcado.bloqueadas} ${resultadoForcado.bloqueadas === 1 ? 'mesa bloqueada' : 'mesas bloqueadas'} (incluindo com conta aberta).`);
+}
+
+liberarTodasBtn.addEventListener('click', liberarTodasMesas);
+bloquearTodasBtn.addEventListener('click', bloquearTodasMesas);
+
+// Controle de Mesas mora num modal (igual Histórico) só pra não deixar a
+// tela do balcão comprida — a lista em si (renderizarControleMesas) continua
+// atualizando sozinha em tempo real mesmo com o modal fechado.
+function abrirControleMesas() {
+  controleMesasOverlay.classList.add('is-open');
+  controleMesasModal.classList.add('is-open');
+}
+
+function fecharControleMesas() {
+  controleMesasOverlay.classList.remove('is-open');
+  controleMesasModal.classList.remove('is-open');
+}
+
+controleMesasBtn.addEventListener('click', abrirControleMesas);
+controleMesasClose.addEventListener('click', fecharControleMesas);
+controleMesasOverlay.addEventListener('click', fecharControleMesas);
 
 // ========================================
 // REALTIME (Supabase)
@@ -1124,6 +1349,45 @@ function desinscreverRealtime() {
 }
 
 // ========================================
+// POLLING DE MESAS (cobre o que o Realtime de "sessoes" acima NÃO cobre)
+// ========================================
+//
+// "mesas" (a tabela) não está publicada no Realtime, de propósito (o token
+// é secreto — ver comentário no fim de supabase/019_bloqueio_mesa.sql; um
+// evento Realtime manda a linha INTEIRA). lidarComAtualizacaoSessao (acima)
+// já cobre o caso de fechamento total, mas liberar_mesa/ativar_mesa/
+// desativar_mesa/liberar_todas_mesas/bloquear_todas_mesas feitos em OUTRO
+// aparelho — inclusive garcom.html, ver mesmo esquema em js/garcom.js —
+// não passam por "sessoes", então ficam invisíveis pro balcão até esse
+// polling rodar. 5s dá resposta quase instantânea sem virar um polling
+// pesado pro tamanho de um bar (poucos aparelhos consultando ao mesmo tempo).
+// (INTERVALO_POLL_MESAS/pollMesasIntervalId ficam declaradas lá em cima,
+// perto de mesasControle/mesasAtivas — ver comentário lá do motivo.)
+
+async function reconsultarMesasControle() {
+  try {
+    await carregarMesasControle();
+    renderizarControleMesas();
+  } catch (erro) {
+    // Silencioso de propósito: um poll que falha não deve interromper o
+    // balcão com alert nenhum — o próximo poll tenta de novo sozinho.
+    console.error('Erro no polling de mesas:', erro);
+  }
+}
+
+function iniciarPollingMesas() {
+  pararPollingMesas();
+  pollMesasIntervalId = setInterval(reconsultarMesasControle, INTERVALO_POLL_MESAS);
+}
+
+function pararPollingMesas() {
+  if (pollMesasIntervalId) {
+    clearInterval(pollMesasIntervalId);
+    pollMesasIntervalId = null;
+  }
+}
+
+// ========================================
 // HISTÓRICO DE PEDIDOS
 // ========================================
 
@@ -1235,10 +1499,16 @@ historicoFiltroLimpar.addEventListener('click', () => {
   renderizarHistorico();
 });
 
-// Esc fecha o modal de histórico e devolve o foco pro botão que o abriu
+// Esc fecha o modal de histórico ou o de controle de mesas (o que estiver
+// aberto) e devolve o foco pro botão que o abriu
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && historicoModal.classList.contains('is-open')) {
+  if (event.key !== 'Escape') return;
+
+  if (historicoModal.classList.contains('is-open')) {
     fecharHistorico();
     historicoBtn.focus();
+  } else if (controleMesasModal.classList.contains('is-open')) {
+    fecharControleMesas();
+    controleMesasBtn.focus();
   }
 });
