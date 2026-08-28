@@ -65,6 +65,21 @@
   }
 }
 
+/* Botão "Novo pedido" (só papel garcom vê, ver renderizarMesas em
+   js/garcom.js) — mesma largura/altura dos outros botões do card. */
+.controle-mesa-card__novo-pedido {
+  align-self: stretch;
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+}
+
+/* Botão "Ver conta" (mesa com sessão aberta, qualquer papel). */
+.controle-mesa-card__ver-conta {
+  align-self: stretch;
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+}
+
 /* Aba Pedidos — mesmo .pedido-card/.balcao-grid de balcao.css, só 1 coluna
    fixa (o "auto-fit, minmax(280px,1fr)" original já quase vira 1 coluna
    num celular, mas trava aqui de propósito em vez de deixar no limite). */
@@ -133,6 +148,115 @@
 
 .garcom-tabbar__item.is-ativo {
   color: var(--laranja-forte);
+}
+
+/* MODAL: NOVO PEDIDO (lançado pelo garçom) */
+.modal-panel--novo-pedido {
+  width: min(420px, 92vw);
+}
+
+/* MODAL: CONTA DA MESA (ver + fechar) */
+.modal-panel--conta-mesa {
+  width: min(420px, 92vw);
+}
+
+.modal-panel--conta-mesa .conta-mesa__fechar {
+  align-self: stretch;
+  margin-top: 0.75rem;
+}
+
+.np-itens {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 0.6rem;
+  margin: 1rem -0.6rem 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.np-categoria__titulo {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--salmao);
+  margin-bottom: 0.4rem;
+}
+
+.np-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.np-item__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.np-item__nome {
+  font-size: 0.92rem;
+  color: var(--branco);
+}
+
+.np-item__preco {
+  font-size: 0.8rem;
+  color: var(--cinza-claro);
+}
+
+.np-item__qtd {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.np-item__botao {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid rgba(245, 119, 46, 0.4);
+  background: rgba(245, 119, 46, 0.1);
+  color: var(--laranja-forte);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.np-item__botao:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.np-item__valor {
+  min-width: 1.4rem;
+  text-align: center;
+  font-weight: 700;
+}
+
+.np-rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.np-rodape__total {
+  color: var(--cinza-claro);
+  font-size: 0.9rem;
+}
+
+.np-rodape__total strong {
+  color: var(--laranja);
+  font-family: var(--fonte-titulo);
+  font-size: 1.1rem;
 }
 
 /* Telas maiores que celular (ex.: testando no PC) — trava a largura no

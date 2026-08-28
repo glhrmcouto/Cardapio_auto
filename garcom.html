@@ -101,6 +101,51 @@
       </button>
     </nav>
 
+    <!-- ===== MODAL: NOVO PEDIDO (lançado pelo garçom, sem QR code) =====
+         Só quem tem papel garçom vê o botão que abre isso (ver
+         renderizarMesas em js/garcom.js) — balcão/admin logados na mesma
+         tela nem enxergam o botão, e a RPC (supabase/024_lancar_pedido_
+         garcom.sql) recusa mesmo que tentem via console: restrita ao
+         papel garcom, nem balcao nem admin passam. -->
+    <div class="modal-overlay" id="novoPedidoOverlay"></div>
+    <div class="modal-panel modal-panel--novo-pedido" id="novoPedidoModal" role="dialog" aria-modal="true" aria-labelledby="novoPedidoTitulo">
+      <div class="modal-panel__header">
+        <span class="modal-panel__title" id="novoPedidoTitulo">Novo pedido — Mesa <span id="novoPedidoMesaNumero"></span></span>
+        <button class="modal-panel__close" id="novoPedidoClose" aria-label="Fechar">&times;</button>
+      </div>
+
+      <label for="novoPedidoNome" class="nome-modal__label">Nome do cliente (opcional)</label>
+      <input type="text" id="novoPedidoNome" class="nome-modal__input" placeholder="Ex: João" maxlength="20">
+
+      <!-- Itens do cardápio agrupados por categoria, com contador +/- por
+           produto — gerado via JS a partir de "produtos" (ativo=true). -->
+      <div class="np-itens" id="novoPedidoItens"></div>
+
+      <div class="np-rodape">
+        <span class="np-rodape__total">Total: <strong id="novoPedidoTotal">R$ 0,00</strong></span>
+        <button type="button" class="btn btn--primary" id="novoPedidoLancarBtn" disabled>Lançar pedido</button>
+      </div>
+    </div>
+
+    <!-- ===== MODAL: CONTA DA MESA (ver + fechar) =====
+         Disponível pra garcom/balcao/admin — mesma RPC e mesmo botão que
+         o balcão já tem em "Mesas Ativas" (conta_da_mesa_balcao +
+         encerrar_sessao), só que reaproveitado aqui a partir do card de
+         mesa. Nenhuma RPC nova (ver ETAPA 5 em js/garcom.js). -->
+    <div class="modal-overlay" id="contaMesaOverlay"></div>
+    <div class="modal-panel modal-panel--conta-mesa" id="contaMesaModal" role="dialog" aria-modal="true" aria-labelledby="contaMesaTitulo">
+      <div class="modal-panel__header">
+        <span class="modal-panel__title" id="contaMesaTitulo">Conta — Mesa <span id="contaMesaNumero"></span></span>
+        <button class="modal-panel__close" id="contaMesaClose" aria-label="Fechar">&times;</button>
+      </div>
+      <p class="modal-panel__vazio" id="contaMesaVazio" style="display: none;">Nenhum pedido registrado ainda.</p>
+      <div class="modal-panel__itens" id="contaMesaItens"></div>
+      <div class="np-rodape">
+        <span class="np-rodape__total">Total: <strong id="contaMesaTotal">—</strong></span>
+      </div>
+      <button type="button" class="btn btn--primary conta-mesa__fechar" id="contaMesaFecharBtn" disabled>Fechar conta</button>
+    </div>
+
   </div>
 
   <!-- Toast de aviso discreto — mesma classe .toast de css/style.css,

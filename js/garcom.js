@@ -7,11 +7,26 @@
 // ETAPA 2: aba Mesas — lista com status, ações por mesa e em massa, tudo
 // reaproveitando as MESMAS RPCs já usadas em balcao.js (nenhuma RPC nova
 // foi criada nessa etapa).
-// ETAPA 3 (esta): aba Pedidos — lista os pedidos pendentes (sessões
-// abertas) com itens/horário/status e o botão "Marcar entregue", igual
-// balcao.js só que enxuto pro celular (sem o botão de remover item —
-// esse fica só no balcão). UPDATE direto em "pedidos" via RLS
-// pedidos_update_authenticated, mesma RPC-menos-RPC que o balcão já usa.
+// ETAPA 3: aba Pedidos — lista os pedidos pendentes (sessões abertas) com
+// itens/horário/status e o botão "Marcar entregue", igual balcao.js só que
+// enxuto pro celular (sem o botão de remover item — esse fica só no
+// balcão). UPDATE direto em "pedidos" via RLS pedidos_update_authenticated,
+// mesma RPC-menos-RPC que o balcão já usa.
+// ETAPA 4: "Novo pedido" — o garçom lança pedido numa mesa SEM QR code,
+// pra cliente sem celular. Precisou de uma RPC nova (lancar_pedido_garcom,
+// ver supabase/024_lancar_pedido_garcom.sql), já que criar_pedido (o
+// caminho do cliente) autoriza por TOKEN da mesa, e o garçom não tem —
+// nem deve ter — acesso a esse token. A RPC nova autoriza por PAPEL em vez
+// de token, e por pedido explícito só aceita papel 'garcom' (nem balcao
+// nem admin) — ver _exigir_garcom() no SQL e papelUsuario/renderizarMesas
+// aqui (o botão só aparece pra quem tem esse papel; a RPC recusa de
+// qualquer forma se alguém tentar burlar via console).
+// ETAPA 5 (esta): "Ver conta"/"Fechar conta" — reaproveita
+// conta_da_mesa_balcao e encerrar_sessao, as MESMAS RPCs que "Mesas
+// Ativas" em balcao.js já usa há muito tempo. Nenhuma RPC nova. Diferente
+// de "Novo pedido", esta ação fica aberta pra garcom/balcao/admin — não é
+// exclusiva de papel, porque fechar conta já era uma ação de qualquer
+// authenticated no balcão antes deste arquivo existir.
 //
 // Login: sessão autenticada (Supabase Auth, igual balcao.html) — mas,
 // diferente de balcao.html (que aceita QUALQUER conta autenticada), aqui
@@ -23,9 +38,9 @@
 // liberar_todas_mesas, bloquear_todas_mesas, encerrar_sessao, e o UPDATE de
 // status de entrega via RLS pedidos_update_authenticated) já são liberadas
 // pra QUALQUER conta authenticated, sem checagem de papel — um garçom
-// logado já consegue chamar todas elas hoje, sem nenhuma RPC nova. A
-// exceção é criar_pedido (lançar pedido pelo garçom), hoje só concedida a
-// "anon" com token de mesa — isso é tratado na Etapa 4, não aqui.
+// logado já consegue chamar todas elas, sem nenhuma RPC nova. A exceção é
+// lancar_pedido_garcom, que exige especificamente o papel garcom (ver
+// ETAPA 4 acima) — nenhuma outra ação desta tela tem essa restrição extra.
 //
 // REALTIME DA ABA MESAS — leia antes de mexer: "mesas" (a tabela) NÃO está
 // publicada no Realtime, de propósito (o token é secreto — ver comentário
@@ -43,7 +58,12 @@
 // tela do cliente fazendo polling de status_da_mesa (ver mostrarMesaBloqueada
 // em js/script.js), só que aqui é a lista inteira via listar_mesas_balcao.
 
-import { supabase } from './supabaseClient.js';
+// Cliente PRÓPRIO desta tela (não o de admin/balcão/mesas/relatórios) —
+// ver js/supabaseClientGarcom.js pro porquê: sem isso, logar aqui e em
+// balcao.html/admin.html ao mesmo tempo (mesmo navegador) faz um login
+// derrubar o outro, porque os dois dividiriam a mesma sessão salva no
+// localStorage.
+import { supabase } from './supabaseClientGarcom.js';
 import { formatarPreco, escaparTexto } from './shared.js';
 
 const loginTela = document.getElementById('loginTela');
@@ -77,6 +97,24 @@ const pedidosTentarBtn = document.getElementById('pedidosTentar');
 const pedidosVazioEl = document.getElementById('pedidosVazio');
 const pedidosGrid = document.getElementById('pedidosGrid');
 const pedidosBadgeEl = document.getElementById('pedidosBadge');
+
+const novoPedidoOverlay = document.getElementById('novoPedidoOverlay');
+const novoPedidoModal = document.getElementById('novoPedidoModal');
+const novoPedidoClose = document.getElementById('novoPedidoClose');
+const novoPedidoMesaNumeroEl = document.getElementById('novoPedidoMesaNumero');
+const novoPedidoNomeInput = document.getElementById('novoPedidoNome');
+const novoPedidoItensEl = document.getElementById('novoPedidoItens');
+const novoPedidoTotalEl = document.getElementById('novoPedidoTotal');
+const novoPedidoLancarBtn = document.getElementById('novoPedidoLancarBtn');
+
+const contaMesaOverlay = document.getElementById('contaMesaOverlay');
+const contaMesaModal = document.getElementById('contaMesaModal');
+const contaMesaClose = document.getElementById('contaMesaClose');
+const contaMesaNumeroEl = document.getElementById('contaMesaNumero');
+const contaMesaVazioEl = document.getElementById('contaMesaVazio');
+const contaMesaItensEl = document.getElementById('contaMesaItens');
+const contaMesaTotalEl = document.getElementById('contaMesaTotal');
+const contaMesaFecharBtn = document.getElementById('contaMesaFecharBtn');
 
 // ========================================================================
 // LOGIN / LOGOUT (com checagem de papel garcom/balcao/admin)
@@ -120,6 +158,14 @@ function mostrarPagina() {
 // pro papel admin.
 const PAPEIS_PERMITIDOS = ['garcom', 'balcao', 'admin'];
 
+// Guardado depois do login pra decidir, na hora de desenhar os cards de
+// mesa, se mostra o botão "Novo pedido" — essa ação (lançar pedido sem QR)
+// é restrita ao papel garcom mesmo (nem balcao nem admin, ver
+// supabase/024_lancar_pedido_garcom.sql e _exigir_garcom() lá dentro).
+// Isso aqui é só UX (esconder um botão que ia dar erro); a restrição de
+// verdade é sempre no banco, dentro da RPC.
+let papelUsuario = null;
+
 async function verificarAcessoEExibir(session) {
   if (!session) {
     mostrarTelaLogin();
@@ -145,6 +191,7 @@ async function verificarAcessoEExibir(session) {
     return;
   }
 
+  papelUsuario = perfil.papel;
   mostrarPagina();
 }
 
@@ -182,6 +229,7 @@ sairBtn.addEventListener('click', () => {
 supabase.auth.onAuthStateChange((_evento, session) => {
   if (!session) {
     paginaIniciada = false;
+    papelUsuario = null;
     pararPollingMesas();
     if (canalRealtime) {
       supabase.removeChannel(canalRealtime);
@@ -308,7 +356,9 @@ function renderizarMesas() {
       <div class="controle-mesa-card__mesa">Mesa ${mesa.numero}</div>
       <span class="controle-mesa-card__status controle-mesa-card__status--${mesa.status_mesa}">${bloqueada ? 'Bloqueada' : 'Liberada'}</span>
       ${temSessaoAberta ? '<span class="controle-mesa-card__sessao">Sessão aberta</span>' : ''}
-      ${bloqueada ? `<button type="button" class="btn btn--primary controle-mesa-card__liberar" data-mesa="${mesa.numero}">Liberar mesa</button>` : ''}
+      ${papelUsuario === 'garcom' ? `<button type="button" class="btn btn--primary controle-mesa-card__novo-pedido" data-mesa="${mesa.numero}">Novo pedido</button>` : ''}
+      ${temSessaoAberta ? `<button type="button" class="btn btn--secondary controle-mesa-card__ver-conta" data-mesa="${mesa.numero}">Ver conta</button>` : ''}
+      ${bloqueada ? `<button type="button" class="btn btn--secondary controle-mesa-card__liberar" data-mesa="${mesa.numero}">Liberar mesa</button>` : ''}
       <button type="button" class="btn btn--secondary controle-mesa-card__desativar" data-mesa="${mesa.numero}">Desativar mesa</button>
     </div>
   `;
@@ -407,6 +457,18 @@ mesasGrid.addEventListener('click', (event) => {
   const botaoAtivar = event.target.closest('.controle-mesa-card__ativar');
   if (botaoAtivar) {
     ativarMesa(botaoAtivar.dataset.mesa, botaoAtivar);
+    return;
+  }
+
+  const botaoNovoPedido = event.target.closest('.controle-mesa-card__novo-pedido');
+  if (botaoNovoPedido) {
+    abrirNovoPedido(botaoNovoPedido.dataset.mesa, botaoNovoPedido);
+    return;
+  }
+
+  const botaoVerConta = event.target.closest('.controle-mesa-card__ver-conta');
+  if (botaoVerConta) {
+    abrirContaMesa(botaoVerConta.dataset.mesa);
   }
 });
 
@@ -511,6 +573,369 @@ async function bloquearTodasMesas() {
 
 liberarTodasBtn.addEventListener('click', liberarTodasMesas);
 bloquearTodasBtn.addEventListener('click', bloquearTodasMesas);
+
+// ========================================================================
+// NOVO PEDIDO (lançado pelo garçom, sem QR code) — ver supabase/
+// 024_lancar_pedido_garcom.sql. Botão só aparece pra papelUsuario==='garcom'
+// (renderizarMesas acima); a RPC também restringe por conta própria, então
+// mesmo alguém forçando a chamada via console não passa sem esse papel.
+// ========================================================================
+
+const LABEL_CATEGORIA = {
+  drink: 'Drinks',
+  cerveja: 'Cervejas',
+  sem_alcool: 'Sem Álcool',
+  narguile: 'Narguilé',
+  essencia: 'Essências',
+};
+const ORDEM_CATEGORIAS = ['drink', 'cerveja', 'sem_alcool', 'narguile', 'essencia'];
+
+let produtosCardapio = [];   // [{id, nome, preco, categoria}] — só ativo=true
+let produtosCarregados = false;
+let mesaNovoPedido = null;   // número da mesa que o modal está editando agora
+let carrinhoNovoPedido = {}; // { [produto_id]: quantidade }, só entradas > 0
+
+// Cardápio é carregado uma vez só (produtos raramente mudam durante o
+// serviço) e reaproveitado em toda abertura do modal depois da primeira.
+// Precisa da policy produtos_select_ativos_authenticated (024) — sem ela,
+// RLS devolve 0 linhas em silêncio pra qualquer authenticated sem papel
+// admin.
+async function garantirProdutosCarregados() {
+  if (produtosCarregados) return;
+
+  const { data, error } = await supabase
+    .from('produtos')
+    .select('id, nome, preco, categoria')
+    .eq('ativo', true)
+    .order('categoria')
+    .order('ordem');
+
+  if (error) throw error;
+
+  produtosCardapio = data;
+  produtosCarregados = true;
+}
+
+// Se a mesa estiver bloqueada, confirma com o garçom e libera ANTES de
+// abrir o cardápio — ele já está vendo que tem gente sentada ali de
+// verdade (é exatamente por isso que está lançando o pedido).
+async function abrirNovoPedido(mesaNumero, botao) {
+  const mesa = mesasControle.find(m => String(m.numero) === String(mesaNumero));
+  if (!mesa) return;
+
+  if (mesa.status_mesa === 'bloqueada') {
+    const confirmou = confirm(`Mesa ${mesaNumero} está bloqueada. Liberar e continuar com o pedido?`);
+    if (!confirmou) return;
+
+    if (botao) {
+      botao.disabled = true;
+      botao.textContent = 'Liberando...';
+    }
+
+    const { error } = await supabase.rpc('liberar_mesa', { p_mesa: Number(mesaNumero) });
+
+    if (botao) {
+      botao.disabled = false;
+      botao.textContent = 'Novo pedido';
+    }
+
+    if (error) {
+      console.error('Erro ao liberar mesa antes do pedido:', error);
+      alert('Não foi possível liberar a mesa agora. Tente de novo.');
+      return;
+    }
+
+    atualizarMesaControleLocal(mesaNumero, 'liberada');
+  }
+
+  try {
+    await garantirProdutosCarregados();
+  } catch (erro) {
+    console.error('Erro ao carregar cardápio pro novo pedido:', erro);
+    alert('Não foi possível carregar o cardápio agora. Verifique sua conexão e tente de novo.');
+    return;
+  }
+
+  mesaNovoPedido = Number(mesaNumero);
+  carrinhoNovoPedido = {};
+  novoPedidoMesaNumeroEl.textContent = mesaNumero;
+  novoPedidoNomeInput.value = '';
+  renderizarProdutosNovoPedido();
+  atualizarTotalNovoPedido();
+
+  novoPedidoOverlay.classList.add('is-open');
+  novoPedidoModal.classList.add('is-open');
+}
+
+function fecharNovoPedido() {
+  novoPedidoOverlay.classList.remove('is-open');
+  novoPedidoModal.classList.remove('is-open');
+}
+
+function renderizarLinhaProdutoNovoPedido(produto) {
+  const qtd = carrinhoNovoPedido[produto.id] || 0;
+  return `
+    <div class="np-item">
+      <div class="np-item__info">
+        <span class="np-item__nome">${escaparTexto(produto.nome)}</span>
+        <span class="np-item__preco">${formatarPreco(produto.preco)}</span>
+      </div>
+      <div class="np-item__qtd">
+        <button type="button" class="np-item__botao" data-acao="menos" data-produto="${produto.id}" ${qtd === 0 ? 'disabled' : ''}>−</button>
+        <span class="np-item__valor" data-qtd-produto="${produto.id}">${qtd}</span>
+        <button type="button" class="np-item__botao" data-acao="mais" data-produto="${produto.id}">+</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderizarProdutosNovoPedido() {
+  const grupos = {};
+  ORDEM_CATEGORIAS.forEach(categoria => { grupos[categoria] = []; });
+  produtosCardapio.forEach(produto => {
+    if (!grupos[produto.categoria]) grupos[produto.categoria] = [];
+    grupos[produto.categoria].push(produto);
+  });
+
+  novoPedidoItensEl.innerHTML = ORDEM_CATEGORIAS
+    .filter(categoria => grupos[categoria] && grupos[categoria].length > 0)
+    .map(categoria => `
+      <div class="np-categoria">
+        <h3 class="np-categoria__titulo">${LABEL_CATEGORIA[categoria] || categoria}</h3>
+        ${grupos[categoria].map(renderizarLinhaProdutoNovoPedido).join('')}
+      </div>
+    `).join('');
+}
+
+// Atualiza só o número (não redesenha a lista toda) — mantém o scroll e a
+// posição do dedo do garçom estáveis enquanto ele toca +/- várias vezes.
+function alterarQuantidadeNovoPedido(produtoId, delta) {
+  const atual = carrinhoNovoPedido[produtoId] || 0;
+  const novo = Math.max(0, Math.min(50, atual + delta));
+
+  if (novo === 0) delete carrinhoNovoPedido[produtoId];
+  else carrinhoNovoPedido[produtoId] = novo;
+
+  const valorEl = novoPedidoItensEl.querySelector(`[data-qtd-produto="${produtoId}"]`);
+  if (valorEl) valorEl.textContent = novo;
+
+  const botaoMenos = novoPedidoItensEl.querySelector(`.np-item__botao[data-acao="menos"][data-produto="${produtoId}"]`);
+  if (botaoMenos) botaoMenos.disabled = novo === 0;
+
+  atualizarTotalNovoPedido();
+}
+
+function atualizarTotalNovoPedido() {
+  let total = 0;
+  let totalItens = 0;
+
+  for (const [produtoId, quantidade] of Object.entries(carrinhoNovoPedido)) {
+    const produto = produtosCardapio.find(p => String(p.id) === produtoId);
+    if (produto) total += produto.preco * quantidade;
+    totalItens += quantidade;
+  }
+
+  novoPedidoTotalEl.textContent = formatarPreco(total);
+  novoPedidoLancarBtn.disabled = totalItens === 0;
+}
+
+novoPedidoItensEl.addEventListener('click', (event) => {
+  const botao = event.target.closest('.np-item__botao');
+  if (!botao) return;
+  const produtoId = Number(botao.dataset.produto);
+  const delta = botao.dataset.acao === 'mais' ? 1 : -1;
+  alterarQuantidadeNovoPedido(produtoId, delta);
+});
+
+// Preço sempre recalculado no banco (lancar_pedido_garcom lê produtos.preco
+// de novo) — o total mostrado aqui é só pra conferência do garçom antes de
+// confirmar, nunca é o que de fato grava.
+async function lancarNovoPedido() {
+  const itens = Object.entries(carrinhoNovoPedido).map(([produtoId, quantidade]) => ({
+    produto_id: Number(produtoId),
+    quantidade,
+  }));
+
+  if (itens.length === 0) return;
+
+  novoPedidoLancarBtn.disabled = true;
+  novoPedidoLancarBtn.textContent = 'Lançando...';
+
+  const { error } = await supabase.rpc('lancar_pedido_garcom', {
+    p_mesa: mesaNovoPedido,
+    p_itens: itens,
+    p_cliente_nome: novoPedidoNomeInput.value.trim() || null,
+  });
+
+  novoPedidoLancarBtn.disabled = false;
+  novoPedidoLancarBtn.textContent = 'Lançar pedido';
+
+  if (error) {
+    console.error('Erro ao lançar pedido:', error);
+    if (error.details === 'MESA_BLOQUEADA') {
+      alert('A mesa foi bloqueada de novo antes do pedido ser lançado (talvez por um fechamento em outro aparelho). Feche, libere a mesa de novo e tente lançar o pedido.');
+    } else {
+      alert(error.message || 'Não foi possível lançar o pedido agora. Verifique sua conexão e tente de novo.');
+    }
+    return;
+  }
+
+  fecharNovoPedido();
+  mostrarToast('Pedido lançado!');
+  // Não precisa empurrar o pedido novo na lista manualmente: o Realtime de
+  // "pedidos" (já assinado, ver inscreverRealtime) traz ele sozinho pra
+  // aba Pedidos, do mesmo jeito que traria um pedido feito pelo cliente.
+}
+
+novoPedidoLancarBtn.addEventListener('click', lancarNovoPedido);
+novoPedidoClose.addEventListener('click', fecharNovoPedido);
+novoPedidoOverlay.addEventListener('click', fecharNovoPedido);
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && novoPedidoModal.classList.contains('is-open')) {
+    fecharNovoPedido();
+  }
+});
+
+// ========================================================================
+// CONTA DA MESA (ver + fechar) — reaproveita conta_da_mesa_balcao e
+// encerrar_sessao, as MESMAS RPCs que "Mesas Ativas" em js/balcao.js já
+// usa. Nenhuma RPC nova. Disponível pra garcom/balcao/admin (não é
+// restrito ao papel garcom — diferente de "Novo pedido" — porque fechar
+// conta já era uma ação aberta a qualquer authenticated no balcão hoje).
+// ========================================================================
+
+let contaMesaAtual = null; // número da mesa que o modal está mostrando agora
+let contaMesaDados = null; // último retorno de conta_da_mesa_balcao pro botão "Fechar conta" usar
+
+function fecharModalContaMesa() {
+  contaMesaOverlay.classList.remove('is-open');
+  contaMesaModal.classList.remove('is-open');
+  contaMesaAtual = null;
+  contaMesaDados = null;
+}
+
+function renderizarContaMesa(conta) {
+  if (conta.itens.length === 0) {
+    contaMesaVazioEl.style.display = 'block';
+    contaMesaItensEl.innerHTML = '';
+  } else {
+    contaMesaVazioEl.style.display = 'none';
+    contaMesaItensEl.innerHTML = `
+      <ul class="pedido-card__itens">
+        ${conta.itens.map(item => `
+          <li>
+            <span>${item.quantidade}x ${escaparTexto(item.nome)}</span>
+            <span>${formatarPreco(item.preco * item.quantidade)}</span>
+          </li>
+        `).join('')}
+      </ul>
+    `;
+  }
+
+  contaMesaTotalEl.textContent = formatarPreco(conta.total_geral);
+}
+
+async function abrirContaMesa(mesaNumero) {
+  contaMesaAtual = Number(mesaNumero);
+  contaMesaDados = null;
+  contaMesaNumeroEl.textContent = mesaNumero;
+  contaMesaVazioEl.style.display = 'none';
+  contaMesaItensEl.innerHTML = '';
+  contaMesaTotalEl.textContent = 'Carregando...';
+  contaMesaFecharBtn.disabled = true;
+
+  contaMesaOverlay.classList.add('is-open');
+  contaMesaModal.classList.add('is-open');
+
+  const { data, error } = await supabase.rpc('conta_da_mesa_balcao', { p_mesa: contaMesaAtual });
+
+  if (error) {
+    console.error('Erro ao consultar conta da mesa:', error);
+    contaMesaTotalEl.textContent = '—';
+    alert('Não foi possível carregar a conta agora. Verifique sua conexão e tente de novo.');
+    return;
+  }
+
+  contaMesaDados = data;
+  renderizarContaMesa(data);
+  contaMesaFecharBtn.disabled = false;
+}
+
+// Mesmo fluxo de tentarEncerrarSessao em js/balcao.js: tenta sem forçar;
+// se a RPC recusar por sobrar saldo em aberto (supabase/009_fechamento_
+// parcial.sql), avisa quanto falta e pergunta se fecha mesmo assim — só
+// então chama de novo com p_forcar=true.
+async function tentarFecharContaMesa(mesa) {
+  const { error } = await supabase.rpc('encerrar_sessao', { p_mesa: Number(mesa), p_forcar: false });
+
+  if (!error) return true;
+
+  if (error.details === 'CONTA_JA_ENCERRADA') {
+    // Sessão provavelmente já foi fechada por outro aparelho (ou pelo
+    // encerramento automático) enquanto este modal estava aberto.
+    alert(error.message);
+    return true;
+  }
+
+  if (error.message && error.message.startsWith('Ainda falta receber')) {
+    const confirmou = confirm(`${error.message}\n\nFechar a conta mesmo assim?`);
+    if (!confirmou) return false;
+
+    const { error: erroForcado } = await supabase.rpc('encerrar_sessao', { p_mesa: Number(mesa), p_forcar: true });
+    if (erroForcado) {
+      console.error('Erro ao forçar fechamento da sessão:', erroForcado);
+      alert('Não foi possível fechar a conta agora. Verifique sua conexão e tente de novo.');
+      return false;
+    }
+    return true;
+  }
+
+  console.error('Erro ao fechar conta:', error);
+  alert(error.message || 'Não foi possível fechar a conta agora. Verifique sua conexão e tente de novo.');
+  return false;
+}
+
+async function fecharContaMesa() {
+  if (!contaMesaAtual || !contaMesaDados) return;
+
+  const confirmou = confirm(
+    `Fechar a conta da Mesa ${contaMesaAtual}? Total: ${formatarPreco(contaMesaDados.total_geral)}. Essa ação não pode ser desfeita.`
+  );
+  if (!confirmou) return;
+
+  contaMesaFecharBtn.disabled = true;
+  contaMesaFecharBtn.textContent = 'Fechando...';
+
+  const sucesso = await tentarFecharContaMesa(contaMesaAtual);
+
+  contaMesaFecharBtn.disabled = false;
+  contaMesaFecharBtn.textContent = 'Fechar conta';
+
+  if (!sucesso) return;
+
+  const mesaFechada = contaMesaAtual;
+  fecharModalContaMesa();
+
+  // Atualização otimista local — o Realtime de "sessoes" (já assinado)
+  // cobriria isso de qualquer forma pra OUTROS aparelhos, mas aqui reflete
+  // na hora, sem esperar o evento ir e voltar.
+  mesasAtivas = mesasAtivas.filter(s => String(s.mesa) !== String(mesaFechada));
+  pedidosGarcom = pedidosGarcom.filter(p => String(p.mesa) !== String(mesaFechada));
+  atualizarMesaControleLocal(mesaFechada, 'bloqueada');
+  renderizarPedidos();
+  mostrarToast(`Conta da Mesa ${mesaFechada} fechada.`);
+}
+
+contaMesaFecharBtn.addEventListener('click', fecharContaMesa);
+contaMesaClose.addEventListener('click', fecharModalContaMesa);
+contaMesaOverlay.addEventListener('click', fecharModalContaMesa);
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && contaMesaModal.classList.contains('is-open')) {
+    fecharModalContaMesa();
+  }
+});
 
 // ========================================================================
 // ABA PEDIDOS — fila de pedidos pendentes (reaproveita a MESMA consulta e
