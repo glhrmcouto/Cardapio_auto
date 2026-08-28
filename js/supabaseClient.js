@@ -1,6 +1,11 @@
 // ========================================================================
-// Cliente único do Supabase — importado tanto pelo cardápio (script.js)
-// quanto pelo balcão (balcao.js).
+// Cliente do Supabase compartilhado por index.html/script.js, balcao.js,
+// admin.js, mesas.js, relatorios.js e gerar-qrcodes.js — todas essas telas
+// dividem a MESMA sessão de login (mesma chave no localStorage). garcom.js
+// é a ÚNICA exceção: usa js/supabaseClientGarcom.js, um client à parte,
+// justamente pra poder ficar logado com uma conta diferente (garçom) ao
+// mesmo tempo que admin/balcão está logado noutra aba do mesmo navegador
+// — ver o comentário completo naquele arquivo.
 //
 // A "publishable key" abaixo é PÚBLICA POR DESIGN: ela vai pro navegador de
 // qualquer pessoa que abrir a página, é só um identificador do projeto,
