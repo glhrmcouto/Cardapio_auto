@@ -387,6 +387,15 @@ exportarCsvBtn.addEventListener('click', () => {
 // porque o admin já tem policy de SELECT nelas (produtos: só admin, ver
 // 003_admin.sql; pedidos/pedido_itens: qualquer authenticated, ver
 // 001_schema.sql) — não precisa de função nova só pra isso.
+//
+// DUAS CÓPIAS, DOIS PROPÓSITOS:
+//   - backup.json: os dados CRUS, exatamente como estão no banco (todas as
+//     colunas, ids, uuids) — é a fonte da verdade caso precise restaurar
+//     ou script algo em cima.
+//   - os .csv: uma versão LEGÍVEL pra abrir no Excel/Sheets — cabeçalho em
+//     português, datas no fuso de SP, preço já formatado, e pedido_itens.csv
+//     já vem com mesa/status/data do pedido embutidos (evita ter que ficar
+//     cruzando manualmente com pedidos.csv pela pedido_id).
 
 const TAMANHO_PAGINA_BACKUP = 1000; // limite padrão de linhas por resposta do PostgREST
 
@@ -417,28 +426,110 @@ async function buscarTabelaCompleta(nomeTabela, colunaOrdenacao) {
   return registros;
 }
 
+const TIPO_PEDIDO_LABEL = { pedido: 'Pedido', fechar_conta: 'Fechar conta' };
+const STATUS_PEDIDO_LABEL = { pendente: 'Pendente', entregue: 'Entregue', finalizado: 'Finalizado' };
+const ORIGEM_PEDIDO_LABEL = { cliente: 'Cliente (QR code)', garcom: 'Garçom' };
+
+// dd/mm/aaaa hh:mm no fuso de SP — mesmo raciocínio das RPCs de relatório
+// (supabase/004_relatorios.sql): "hoje"/horário tem que bater com o
+// relógio de parede do bar, não com UTC.
+function formatarDataHoraCsv(iso) {
+  if (!iso) return '';
+  // toLocaleString bota uma vírgula entre data e hora por padrão
+  // ("27/08/2026, 18:10") — tirada aqui só por estética.
+  return new Date(iso).toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).replace(',', '');
+}
+
+function formatarBooleanoCsv(valor) {
+  if (valor === null || valor === undefined) return '';
+  return valor ? 'Sim' : 'Não';
+}
+
+// Cabeçalho em português, preço já em "R$ 0,00", ativo como Sim/Não.
+function linhasProdutosCsv(produtos) {
+  return produtos.map(p => ({
+    'ID': p.id,
+    'Nome': p.nome,
+    'Descrição': p.descricao,
+    'Preço': formatarPreco(p.preco),
+    'Categoria': LABEL_CATEGORIA[p.categoria] || p.categoria,
+    'Ativo': formatarBooleanoCsv(p.ativo),
+    'Ordem': p.ordem,
+  }));
+}
+
+// Sem cliente_id/sessao_id (uuid técnico, não ajuda a leitura humana) —
+// quem precisar disso ao pé da letra usa o backup.json.
+function linhasPedidosCsv(pedidos) {
+  return pedidos.map(p => ({
+    'ID': p.id,
+    'Tipo': TIPO_PEDIDO_LABEL[p.tipo] || p.tipo,
+    'Mesa': p.mesa,
+    'Cliente': p.cliente_nome || '',
+    'Total': formatarPreco(p.total),
+    'Status': STATUS_PEDIDO_LABEL[p.status] || p.status,
+    'Origem': ORIGEM_PEDIDO_LABEL[p.origem] || p.origem || '',
+    'Data/Hora': formatarDataHoraCsv(p.criado_em),
+  }));
+}
+
+// Junta mesa/status/data do PEDIDO em cada linha de item — sem isso, uma
+// planilha de itens com só "pedido_id" cru força a ficar cruzando com
+// pedidos.csv manualmente pra saber de qual mesa/dia é cada item.
+function linhasPedidoItensCsv(pedidoItens, pedidos) {
+  const pedidosPorId = new Map(pedidos.map(p => [p.id, p]));
+
+  return pedidoItens.map(item => {
+    const pedido = pedidosPorId.get(item.pedido_id);
+    return {
+      'ID Item': item.id,
+      'ID Pedido': item.pedido_id,
+      'Mesa': pedido ? pedido.mesa : '',
+      'Data/Hora do Pedido': pedido ? formatarDataHoraCsv(pedido.criado_em) : '',
+      'Status do Pedido': pedido ? (STATUS_PEDIDO_LABEL[pedido.status] || pedido.status) : '',
+      'Produto': item.nome_snapshot,
+      'Preço Unitário': formatarPreco(item.preco_unitario),
+      'Quantidade': item.quantidade,
+      'Subtotal': formatarPreco(item.preco_unitario * item.quantidade),
+      'Compartilhado': formatarBooleanoCsv(item.compartilhado),
+    };
+  });
+}
+
 // Colunas de reserva pra quando a tabela vier vazia (aí não dá pra descobrir
-// as colunas olhando a primeira linha, porque ela não existe)
-const COLUNAS_PADRAO_BACKUP = {
-  produtos: ['id', 'nome', 'descricao', 'preco', 'categoria', 'ativo', 'ordem'],
-  pedidos: ['id', 'tipo', 'mesa', 'total', 'status', 'criado_em'],
-  pedido_itens: ['id', 'pedido_id', 'produto_id', 'nome_snapshot', 'preco_unitario', 'quantidade'],
+// as colunas olhando a primeira linha, porque ela não existe).
+const COLUNAS_CSV_VAZIO = {
+  produtos: ['ID', 'Nome', 'Descrição', 'Preço', 'Categoria', 'Ativo', 'Ordem'],
+  pedidos: ['ID', 'Tipo', 'Mesa', 'Cliente', 'Total', 'Status', 'Origem', 'Data/Hora'],
+  pedido_itens: ['ID Item', 'ID Pedido', 'Mesa', 'Data/Hora do Pedido', 'Status do Pedido', 'Produto', 'Preço Unitário', 'Quantidade', 'Subtotal', 'Compartilhado'],
 };
 
 function escaparCampoCsv(valor) {
   if (valor === null || valor === undefined) return '';
   const texto = typeof valor === 'object' ? JSON.stringify(valor) : String(valor);
-  return /[",\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+  return /[;",\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
 }
 
-// Ao contrário do CSV de "mais vendidos" (formatado pra leitura humana em
-// pt-BR), este aqui preserva os valores crus — é um backup, não um
-// relatório, então número/data devem voltar exatamente como estão no banco.
-function paraCsvBackup(linhas, nomeTabela) {
-  const colunas = linhas.length > 0 ? Object.keys(linhas[0]) : COLUNAS_PADRAO_BACKUP[nomeTabela];
-  const cabecalho = colunas.join(',');
-  const corpo = linhas.map(linha => colunas.map(coluna => escaparCampoCsv(linha[coluna])).join(',')).join('\r\n');
-  return '﻿' + cabecalho + '\r\n' + corpo;
+// Separador ";" (não ","), mesmo motivo do CSV de "mais vendidos" logo
+// acima: no Excel em pt-BR, "," é o separador decimal — um CSV separado por
+// vírgula não abre em colunas certas nessa configuração regional. BOM UTF-8
+// (﻿) no início pros acentos abrirem certo — ATENÇÃO: precisa ser
+// exatamente esse escape (﻿), nunca um caractere "invisível" digitado
+// direto no código-fonte — foi isso que se perdeu silenciosamente antes
+// (o literal virou uma string vazia sem ninguém perceber, e os CSVs saíam
+// sem BOM nenhum, dando os acentos quebrados tipo "TÃ´nica").
+function paraCsvLegivel(linhas, nomeTabela) {
+  const colunas = linhas.length > 0 ? Object.keys(linhas[0]) : COLUNAS_CSV_VAZIO[nomeTabela];
+  const cabecalho = colunas.join(';');
+  const corpo = linhas.map(linha => colunas.map(coluna => escaparCampoCsv(linha[coluna])).join(';')).join('\r\n');
+  return '﻿' + cabecalho + (corpo ? '\r\n' + corpo : '');
 }
 
 async function baixarBackupCompleto() {
@@ -456,9 +547,9 @@ async function baixarBackupCompleto() {
     const zip = new JSZip();
 
     zip.file('backup.json', JSON.stringify({ gerado_em: geradoEm, produtos, pedidos, pedido_itens: pedidoItens }, null, 2));
-    zip.file('produtos.csv', paraCsvBackup(produtos, 'produtos'));
-    zip.file('pedidos.csv', paraCsvBackup(pedidos, 'pedidos'));
-    zip.file('pedido_itens.csv', paraCsvBackup(pedidoItens, 'pedido_itens'));
+    zip.file('produtos.csv', paraCsvLegivel(linhasProdutosCsv(produtos), 'produtos'));
+    zip.file('pedidos.csv', paraCsvLegivel(linhasPedidosCsv(pedidos), 'pedidos'));
+    zip.file('pedido_itens.csv', paraCsvLegivel(linhasPedidoItensCsv(pedidoItens, pedidos), 'pedido_itens'));
 
     const blob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(blob);
