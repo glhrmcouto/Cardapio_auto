@@ -17,14 +17,12 @@
 // do garçom fica guardada numa chave própria do localStorage, independente
 // da sessão usada por admin/balcão/mesas/relatórios. As duas contas podem
 // ficar logadas ao mesmo tempo, cada uma na sua tela, no mesmo navegador.
-// Mesma URL/chave pública do projeto (não é outro projeto Supabase, só
-// outra "gaveta" de sessão) — ver comentário de segurança completo em
+// Mesma URL/chave pública do projeto (js/supabaseConfig.js — não é outro
+// projeto Supabase, só outra "gaveta" de sessão) — ver comentário de segurança completo em
 // js/supabaseClient.js.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.8';
-
-const SUPABASE_URL = 'https://ucsjnlynjsfbwripteuo.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_LXWrv90MTy68XlK1MRO7yg_RzKh4ny8';
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './supabaseConfig.js';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {

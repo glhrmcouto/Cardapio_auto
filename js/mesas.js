@@ -8,17 +8,9 @@
 // admin.html — a lógica de mesas em si não mudou, só saiu de lá pra cá.
 
 import { supabase } from './supabaseClient.js';
-import { escaparAtributo } from './shared.js';
+import { configurarLogin } from './auth.js';
+import { escaparAtributo, montarUrlMesa, mostrarFeedback } from './shared.js';
 
-const loginTela = document.getElementById('loginTela');
-const loginForm = document.getElementById('loginForm');
-const loginEmailEl = document.getElementById('loginEmail');
-const loginSenhaEl = document.getElementById('loginSenha');
-const loginErroEl = document.getElementById('loginErro');
-const loginEntrarBtn = document.getElementById('loginEntrarBtn');
-
-const mesasPagina = document.getElementById('mesasPagina');
-const sairBtn = document.getElementById('sairBtn');
 
 const mesasCarregandoEl = document.getElementById('mesasCarregando');
 const mesasErroEl = document.getElementById('mesasErro');
@@ -26,126 +18,6 @@ const mesasTentarBtn = document.getElementById('mesasTentar');
 const mesasContainer = document.getElementById('mesasContainer');
 const novaMesaForm = document.getElementById('novaMesaForm');
 const novaMesaNumeroEl = document.getElementById('novaMesaNumero');
-
-// ========================================
-// LOGIN / LOGOUT (com checagem de papel admin)
-// ========================================
-
-function mostrarTelaLogin(mensagemErro) {
-  mesasPagina.style.display = 'none';
-  loginTela.style.display = 'flex';
-  loginEmailEl.value = '';
-  loginSenhaEl.value = '';
-
-  if (mensagemErro) {
-    loginErroEl.textContent = mensagemErro;
-    loginErroEl.style.display = 'block';
-  } else {
-    loginErroEl.style.display = 'none';
-  }
-}
-
-// Carrega as mesas só na primeira vez que a página abre (evita recarregar
-// tudo de novo se onAuthStateChange disparar outra vez, ex.: refresh de token)
-let paginaIniciada = false;
-
-async function mostrarPagina() {
-  loginTela.style.display = 'none';
-  mesasPagina.style.display = '';
-
-  if (paginaIniciada) return;
-  paginaIniciada = true;
-
-  await carregarMesas();
-}
-
-// Verifica se a sessão logada pertence a um usuário com papel "admin" em
-// "perfis". Login com credenciais válidas mas sem esse papel é barrado aqui.
-async function verificarAdminEExibir(session) {
-  if (!session) {
-    mostrarTelaLogin();
-    return;
-  }
-
-  const { data: perfil, error } = await supabase
-    .from('perfis')
-    .select('papel')
-    .eq('user_id', session.user.id)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Erro ao verificar permissão de admin:', error);
-    mostrarTelaLogin('Não foi possível verificar sua permissão agora. Tente de novo.');
-    await supabase.auth.signOut();
-    return;
-  }
-
-  if (!perfil || perfil.papel !== 'admin') {
-    mostrarTelaLogin('Este usuário não tem permissão de administrador.');
-    await supabase.auth.signOut();
-    return;
-  }
-
-  mostrarPagina();
-}
-
-loginForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-
-  loginEntrarBtn.disabled = true;
-  loginEntrarBtn.textContent = 'Entrando...';
-  loginErroEl.style.display = 'none';
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: loginEmailEl.value.trim(),
-    password: loginSenhaEl.value,
-  });
-
-  loginEntrarBtn.disabled = false;
-  loginEntrarBtn.textContent = 'Entrar';
-
-  if (error) {
-    loginErroEl.textContent = 'E-mail ou senha inválidos.';
-    loginErroEl.style.display = 'block';
-    return;
-  }
-
-  await verificarAdminEExibir(data.session);
-});
-
-sairBtn.addEventListener('click', () => {
-  supabase.auth.signOut();
-});
-
-// Só reage a LOGOUT aqui — o login bem-sucedido já é tratado logo acima
-// (via verificarAdminEExibir), pra não checar o papel de novo a cada refresh
-// automático de token.
-supabase.auth.onAuthStateChange((_evento, session) => {
-  if (!session) {
-    paginaIniciada = false;
-    mostrarTelaLogin();
-  }
-});
-
-// Checagem inicial explícita (a sessão persiste sozinha entre recarregamentos)
-const { data: { session: sessaoInicial } } = await supabase.auth.getSession();
-await verificarAdminEExibir(sessaoInicial);
-
-// ========================================
-// FEEDBACK DE SALVAR (sucesso/erro, some sozinho depois de alguns segundos)
-// ========================================
-
-function mostrarFeedback(card, mensagem, tipo) {
-  const feedbackEl = card.querySelector('.admin-produto-card__feedback');
-  feedbackEl.textContent = mensagem;
-  feedbackEl.classList.remove('admin-produto-card__feedback--sucesso', 'admin-produto-card__feedback--erro');
-  feedbackEl.classList.add(tipo === 'sucesso' ? 'admin-produto-card__feedback--sucesso' : 'admin-produto-card__feedback--erro');
-
-  clearTimeout(feedbackEl._timer);
-  feedbackEl._timer = setTimeout(() => {
-    feedbackEl.textContent = '';
-  }, 4000);
-}
 
 // ========================================
 // MESAS (token do QR code — ver supabase/005_seguranca.sql)
@@ -182,13 +54,6 @@ async function carregarMesas() {
 }
 
 mesasTentarBtn.addEventListener('click', carregarMesas);
-
-// Monta a URL exata que deve virar QR code, a partir do próprio domínio em
-// que a página está rodando — assim funciona igual em localhost, no
-// preview do Netlify e no domínio final, sem precisar fixar nada aqui.
-function montarUrlMesa(mesa) {
-  return `${window.location.origin}/index.html?mesa=${mesa.numero}&t=${mesa.token}`;
-}
 
 function renderizarMesaCard(mesa) {
   const statusClasse = mesa.ativa ? 'admin-produto-card__status--ativo' : 'admin-produto-card__status--inativo';
@@ -333,4 +198,15 @@ novaMesaForm.addEventListener('submit', async (event) => {
   todasMesas.push(mesaNova);
   todasMesas.sort((a, b) => a.numero - b.numero);
   renderizarMesas();
+});
+
+// ========================================
+// BOOTSTRAP (fica por último de propósito — ver configurarLogin em auth.js)
+// ========================================
+
+await configurarLogin({
+  cliente: supabase,
+  conteudoEl: document.getElementById('mesasPagina'),
+  papeis: ['admin'],
+  aoEntrar: carregarMesas,
 });

@@ -22,8 +22,6 @@
 // ========================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.8';
-
-const SUPABASE_URL = 'https://ucsjnlynjsfbwripteuo.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_LXWrv90MTy68XlK1MRO7yg_RzKh4ny8';
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './supabaseConfig.js';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);

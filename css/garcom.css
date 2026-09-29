@@ -1,6 +1,6 @@
 /* ========================================================================
    TELA DO GARÇOM — mobile-first de verdade (o garçom usa no celular,
-   andando pelo salão). Reaproveita .btn/.login-tela/.toast de style.css e
+   andando pelo salão). Reaproveita .btn/.login-tela/.toast de base.css e
    .controle-mesa-card* de balcao.css (Etapa 2 lista mesa com o mesmo
    card visual do painel "Controle de Mesas" do balcão) — aqui só o que é
    específico desta tela: header enxuto e a barra de abas no rodapé.
