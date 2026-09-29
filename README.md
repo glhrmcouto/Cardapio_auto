@@ -62,9 +62,9 @@ relatorios.html                 → painel do dono (vendas + backup manual)
 gerar-qrcodes.html              → gerador de QR code das mesas
 404.html                        → página de erro personalizada
 js/
-  script.js                     → lógica do cardápio público (index.html)
-  balcao.js                     → lógica do painel do balcão
-  admin.js                      → lógica do painel do dono (cardápio + mesas)
+  script.js + cardapio/         → cardápio público (index.html): script.js só importa os módulos
+  balcao.js + balcao/           → painel do balcão: balcao.js faz login/bootstrap, um módulo por painel
+  admin.js + admin/             → painel do dono: produtos, mesas e configurações
   relatorios.js                 → lógica do painel de relatórios
   gerar-qrcodes.js               → lógica do gerador de QR code
   auth.js                       → login/logout das telas restritas (balcão, admin, relatórios, QR codes)
@@ -84,6 +84,17 @@ supabase/
   005_seguranca.sql              → tabela "mesas" (token por QR code) + limites de abuso nos pedidos
   006_taxa_servico.sql           → taxa de serviço (10%) no fechamento de conta
   007_token_conta_mesa.sql       → exige o token da mesa também em conta_da_mesa
+  008_sessoes.sql                → sessão de mesa, identificação do cliente e item compartilhado
+  009_fechamento_parcial.sql     → "fechar minha parte" (pagamentos por pessoa)
+  010_taxa_servico_configuravel.sql → taxa de serviço editável no admin (tabela configuracoes)
+  011_correcoes_saldo_e_concorrencia.sql → correções de saldo e de concorrência no fechamento
+  012_realtime_sessoes.sql       → Realtime na tabela "sessoes" (painel Mesas Ativas)
+  013_agrupar_por_nome.sql       → agrupa a mesma pessoa por nome na conta
+  014_sessao_vinculada.sql       → pedido/fechamento vinculados ao session_id do navegador
+  015_encerramento_automatico.sql → encerra a sessão sozinha quando a conta é quitada
+  016_rate_limit_por_pessoa.sql  → limite de pedidos por pessoa
+  schema_completo.sql            → estado final de todas as migrações num arquivo só (instalação nova)
+  ferramentas/gerar_schema_completo.mjs → gera e confere o schema_completo.sql
 .github/workflows/backup.yml    → backup diário automático (pg_dump)
 BALCAO.md                       → configurar o PC do balcão em modo quiosque
 MANUAL.md                       → manual de uso pro dono/garçons, sem jargão técnico
@@ -115,33 +126,31 @@ troque `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY` nesse arquivo temporariamente.
 ## Como configurar o Supabase do zero
 
 Se for montar o projeto do zero (novo bar, ou recuperando de um backup),
-rode as migrações do `supabase/`, **nessa ordem**, no **SQL Editor** do
-painel do Supabase (`supabase.com/dashboard` → seu projeto → SQL Editor):
+rode **um arquivo só** no **SQL Editor** do painel do Supabase
+(`supabase.com/dashboard` → seu projeto → SQL Editor):
 
-1. **`001_schema.sql`** — cria as tabelas `produtos`, `pedidos`,
-   `pedido_itens`, o RLS básico e as RPCs públicas que o cardápio usa
-   (`criar_pedido`, `pedir_fechamento`, `conta_da_mesa`). Já vem com os
-   produtos/preços do cardápio original como seed — edite a lista de
-   `insert into produtos` no final do arquivo antes de rodar se for um
-   cardápio diferente.
-2. **`002_realtime.sql`** — sem isso o balcão não recebe pedido nenhum em
-   tempo real (a assinatura Realtime fica "pendurada" sem nunca disparar).
-3. **`003_admin.sql`** — cria a tabela `perfis` (quem é admin, quem é
-   balcão) e libera admin.html pra editar produtos. **No final do arquivo**
-   tem um `insert` comentado — troque o e-mail pelo e-mail de um usuário
-   real e rode-o (ver passo seguinte).
-4. **`004_relatorios.sql`** — as RPCs por trás de `relatorios.html`.
-5. **`005_seguranca.sql`** — cria a tabela `mesas` (token secreto por QR
-   code) e adiciona limite de frequência/tamanho nos pedidos. **Ajuste o
-   `generate_series(1, 20)` do seed** pro número real de mesas do bar antes
-   de rodar (ou pule o seed e cadastre as mesas uma a uma pelo admin.html).
-6. **`006_taxa_servico.sql`** — adiciona os 10% de taxa de serviço ao
-   fechamento de conta (só ali, não nos pedidos individuais).
-7. **`007_token_conta_mesa.sql`** — fecha o mesmo tipo de proteção da 005
-   (token da mesa) na consulta de conta usada no botão "Fechar Conta" do
-   cliente.
+- **`supabase/schema_completo.sql`** — cria tudo de uma vez: tabelas, RLS,
+  RPCs, Realtime, a configuração da taxa de serviço (10%), o cardápio de
+  exemplo e as mesas 1 a 20 (cada uma com seu token). Antes de rodar, se
+  for outro bar, ajuste no fim do arquivo os `INSERT INTO public.produtos`
+  e o `generate_series(1, 20)` das mesas (ou deixe como está e edite tudo
+  depois pelo admin.html).
 
-Depois das migrações, crie os usuários de login:
+Ele é o resultado de aplicar as migrações `001_...sql` a `016_...sql` em
+ordem, gerado e conferido automaticamente — rodar as migrações uma a uma,
+em ordem numérica, dá exatamente o mesmo banco. **Num banco que já está
+em uso, nunca rode o `schema_completo.sql`**: aplique só as migrações novas.
+
+**Criou uma migração nova?** Rode o gerador de novo e commite as duas coisas
+juntas (precisa de Node 20+; não instala nada no projeto):
+
+```bash
+cd supabase/ferramentas
+npm install --no-save @electric-sql/pglite @electric-sql/pglite-tools
+node gerar_schema_completo.mjs
+```
+
+Depois de criar o banco, crie os usuários de login:
 
 1. No painel do Supabase → **Authentication** → **Users** → **Add user** →
    crie um usuário pra quem vai logar no admin (e-mail + senha) e, se quiser
