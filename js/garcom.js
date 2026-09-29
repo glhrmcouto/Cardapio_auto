@@ -64,17 +64,9 @@
 // derrubar o outro, porque os dois dividiriam a mesma sessão salva no
 // localStorage.
 import { supabase } from './supabaseClientGarcom.js';
+import { configurarLogin } from './auth.js';
 import { formatarPreco, escaparTexto } from './shared.js';
 
-const loginTela = document.getElementById('loginTela');
-const loginForm = document.getElementById('loginForm');
-const loginEmailEl = document.getElementById('loginEmail');
-const loginSenhaEl = document.getElementById('loginSenha');
-const loginErroEl = document.getElementById('loginErro');
-const loginEntrarBtn = document.getElementById('loginEntrarBtn');
-
-const garcomConteudo = document.getElementById('garcomConteudo');
-const sairBtn = document.getElementById('sairBtn');
 
 const abaMesas = document.getElementById('abaMesas');
 const abaPedidos = document.getElementById('abaPedidos');
@@ -116,128 +108,13 @@ const contaMesaItensEl = document.getElementById('contaMesaItens');
 const contaMesaTotalEl = document.getElementById('contaMesaTotal');
 const contaMesaFecharBtn = document.getElementById('contaMesaFecharBtn');
 
-// ========================================================================
-// LOGIN / LOGOUT (com checagem de papel garcom/balcao/admin)
-// ========================================================================
-
-function mostrarTelaLogin(mensagemErro) {
-  garcomConteudo.style.display = 'none';
-  loginTela.style.display = 'flex';
-  loginEmailEl.value = '';
-  loginSenhaEl.value = '';
-
-  if (mensagemErro) {
-    loginErroEl.textContent = mensagemErro;
-    loginErroEl.style.display = 'block';
-  } else {
-    loginErroEl.style.display = 'none';
-  }
-}
-
-let paginaIniciada = false;
-
-function mostrarPagina() {
-  loginTela.style.display = 'none';
-  garcomConteudo.style.display = '';
-
-  if (paginaIniciada) return;
-  paginaIniciada = true;
-
-  carregarMesasIniciais();
-  carregarPedidosIniciais();
-  inscreverRealtime();
-  iniciarPollingMesas();
-}
-
-// Verifica se a sessão logada pertence a um usuário com papel garcom,
-// balcao OU admin em "perfis" (os três podem operar o salão — ver
-// eh_garcom_ou_balcao() em supabase/023_papel_garcom.sql). Diferente de
-// admin.js, aqui a checagem é feita direto no client (SELECT simples,
-// permitido pela policy perfis_select_proprio) em vez de via RPC — mais
-// simples e é exatamente o mesmo padrão já usado em admin.js/relatorios.js
-// pro papel admin.
-const PAPEIS_PERMITIDOS = ['garcom', 'balcao', 'admin'];
-
-// Guardado depois do login pra decidir, na hora de desenhar os cards de
-// mesa, se mostra o botão "Novo pedido" — essa ação (lançar pedido sem QR)
-// é restrita ao papel garcom mesmo (nem balcao nem admin, ver
-// supabase/024_lancar_pedido_garcom.sql e _exigir_garcom() lá dentro).
-// Isso aqui é só UX (esconder um botão que ia dar erro); a restrição de
-// verdade é sempre no banco, dentro da RPC.
+// Papel de quem logou (garcom, balcao ou admin), guardado pra decidir, na
+// hora de desenhar os cards de mesa, se mostra o botão "Novo pedido" — essa
+// ação (lançar pedido sem QR) é restrita ao papel garcom mesmo (nem balcao
+// nem admin, ver supabase/024_lancar_pedido_garcom.sql e _exigir_garcom()
+// lá dentro). Isso aqui é só UX (esconder um botão que ia dar erro); a
+// restrição de verdade é sempre no banco, dentro da RPC.
 let papelUsuario = null;
-
-async function verificarAcessoEExibir(session) {
-  if (!session) {
-    mostrarTelaLogin();
-    return;
-  }
-
-  const { data: perfil, error } = await supabase
-    .from('perfis')
-    .select('papel')
-    .eq('user_id', session.user.id)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Erro ao verificar permissão de acesso:', error);
-    mostrarTelaLogin('Não foi possível verificar sua permissão agora. Tente de novo.');
-    await supabase.auth.signOut();
-    return;
-  }
-
-  if (!perfil || !PAPEIS_PERMITIDOS.includes(perfil.papel)) {
-    mostrarTelaLogin('Este usuário não tem permissão de garçom/balcão/admin.');
-    await supabase.auth.signOut();
-    return;
-  }
-
-  papelUsuario = perfil.papel;
-  mostrarPagina();
-}
-
-loginForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-
-  loginEntrarBtn.disabled = true;
-  loginEntrarBtn.textContent = 'Entrando...';
-  loginErroEl.style.display = 'none';
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: loginEmailEl.value.trim(),
-    password: loginSenhaEl.value,
-  });
-
-  loginEntrarBtn.disabled = false;
-  loginEntrarBtn.textContent = 'Entrar';
-
-  if (error) {
-    loginErroEl.textContent = 'E-mail ou senha inválidos.';
-    loginErroEl.style.display = 'block';
-    return;
-  }
-
-  await verificarAcessoEExibir(data.session);
-});
-
-sairBtn.addEventListener('click', () => {
-  supabase.auth.signOut();
-});
-
-// Só reage a LOGOUT aqui — o login bem-sucedido já é tratado logo acima
-// (via verificarAcessoEExibir), pra não checar o papel de novo a cada
-// refresh automático de token.
-supabase.auth.onAuthStateChange((_evento, session) => {
-  if (!session) {
-    paginaIniciada = false;
-    papelUsuario = null;
-    pararPollingMesas();
-    if (canalRealtime) {
-      supabase.removeChannel(canalRealtime);
-      canalRealtime = null;
-    }
-    mostrarTelaLogin();
-  }
-});
 
 // ========================================================================
 // ABAS (Mesas / Pedidos)
@@ -1162,18 +1039,33 @@ function pararPollingMesas() {
 }
 
 // ========================================================================
-// CHECAGEM INICIAL DE SESSÃO — TEM que ser a ÚLTIMA coisa do arquivo
+// BOOTSTRAP — TEM que ser a ÚLTIMA coisa do arquivo (ver configurarLogin em
+// auth.js: qualquer "let" declarado depois ainda estaria na zona morta
+// temporal quando aoEntrar rodasse — já aconteceu aqui com
+// mesasAtivas/canalRealtime)
 // ========================================================================
 //
-// É um top-level await: a execução do módulo PAUSA aqui até resolver, e só
-// então mostrarPagina()/carregarMesasIniciais() (chamados de dentro de
-// verificarAcessoEExibir) rodam de verdade. Se isso ficasse no meio do
-// arquivo (como ficou por engano numa versão anterior), qualquer "let"
-// declarado DEPOIS dele ainda estaria na zona morta temporal quando essas
-// funções tentassem usá-lo — ReferenceError "Cannot access 'x' before
-// initialization" (foi exatamente o bug: mesasAtivas/canalRealtime
-// declarados mais abaixo, acessados por uma chamada disparada por este
-// await antes de o arquivo terminar de rodar até a declaração deles).
-// Ficando por último, TUDO que a página inicial pode precisar já existe.
-const { data: { session: sessaoInicial } } = await supabase.auth.getSession();
-await verificarAcessoEExibir(sessaoInicial);
+// Papéis aceitos: garcom, balcao OU admin (os três podem operar o salão —
+// ver eh_garcom_ou_balcao() em supabase/023_papel_garcom.sql).
+
+await configurarLogin({
+  cliente: supabase,
+  conteudoEl: document.getElementById('garcomConteudo'),
+  papeis: ['garcom', 'balcao', 'admin'],
+  mensagemSemPermissao: 'Este usuário não tem permissão de garçom/balcão/admin.',
+  aoEntrar: (papel) => {
+    papelUsuario = papel;
+    carregarMesasIniciais();
+    carregarPedidosIniciais();
+    inscreverRealtime();
+    iniciarPollingMesas();
+  },
+  aoSair: () => {
+    papelUsuario = null;
+    pararPollingMesas();
+    if (canalRealtime) {
+      supabase.removeChannel(canalRealtime);
+      canalRealtime = null;
+    }
+  },
+});

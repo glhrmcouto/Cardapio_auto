@@ -10,21 +10,13 @@
 // aparelho (celular do cliente fazendo pedido enquanto o balcão fica no PC).
 
 import { supabase } from './supabaseClient.js';
+import { configurarLogin } from './auth.js';
 import { formatarPreco, escaparTexto } from './shared.js';
 
 // ========================================
 // ELEMENTOS
 // ========================================
 
-const loginTela = document.getElementById('loginTela');
-const loginForm = document.getElementById('loginForm');
-const loginEmailEl = document.getElementById('loginEmail');
-const loginSenhaEl = document.getElementById('loginSenha');
-const loginErroEl = document.getElementById('loginErro');
-const loginEntrarBtn = document.getElementById('loginEntrarBtn');
-
-const balcaoConteudo = document.getElementById('balcaoConteudo');
-const sairBtn = document.getElementById('sairBtn');
 const conexaoStatusEl = document.getElementById('conexaoStatus');
 
 const balcaoErroEl = document.getElementById('balcaoErro');
@@ -98,95 +90,6 @@ function formatarHorario(iso) {
 
 function formatarData(iso) {
   return new Date(iso).toLocaleDateString('pt-BR');
-}
-
-// ========================================
-// LOGIN / LOGOUT
-// ========================================
-
-function mostrarTelaLogin(mensagemErro) {
-  balcaoConteudo.style.display = 'none';
-  loginTela.style.display = 'flex';
-  loginEmailEl.value = '';
-  loginSenhaEl.value = '';
-
-  if (mensagemErro) {
-    loginErroEl.textContent = mensagemErro;
-    loginErroEl.style.display = 'block';
-  } else {
-    loginErroEl.style.display = 'none';
-  }
-}
-
-// Carrega os dados iniciais e assina o Realtime só na primeira vez que loga
-// (evita assinar duas vezes se onAuthStateChange disparar de novo, ex.: refresh de token)
-let balcaoIniciado = false;
-
-async function mostrarTelaLogada() {
-  loginTela.style.display = 'none';
-  balcaoConteudo.style.display = '';
-
-  if (balcaoIniciado) return;
-  balcaoIniciado = true;
-
-  await carregarTudoInicial();
-  inscreverRealtime();
-  iniciarPollingMesas();
-}
-
-loginForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-
-  loginEntrarBtn.disabled = true;
-  loginEntrarBtn.textContent = 'Entrando...';
-  loginErroEl.style.display = 'none';
-
-  const { error } = await supabase.auth.signInWithPassword({
-    email: loginEmailEl.value.trim(),
-    password: loginSenhaEl.value,
-  });
-
-  loginEntrarBtn.disabled = false;
-  loginEntrarBtn.textContent = 'Entrar';
-
-  if (error) {
-    loginErroEl.textContent = 'E-mail ou senha inválidos.';
-    loginErroEl.style.display = 'block';
-  }
-  // Se dar certo, onAuthStateChange (abaixo) cuida de trocar de tela.
-});
-
-sairBtn.addEventListener('click', () => {
-  supabase.auth.signOut();
-});
-
-// Reage a login/logout — inclusive logout feito em outra aba, já que o supabase-js
-// propaga a mudança de sessão entre abas do mesmo navegador.
-supabase.auth.onAuthStateChange((_evento, session) => {
-  if (session) {
-    mostrarTelaLogada();
-  } else {
-    desinscreverRealtime();
-    pararPollingMesas();
-    balcaoIniciado = false;
-    pedidos = [];
-    fechamentos = [];
-    pagamentosPendentes = [];
-    mesasAtivas = [];
-    renderizarPedidos();
-    fechamentoGrid.innerHTML = '';
-    pagamentoGrid.innerHTML = '';
-    mesasAtivasGrid.innerHTML = '';
-    mostrarTelaLogin();
-  }
-});
-
-// Checagem inicial explícita (a sessão persiste sozinha entre recarregamentos)
-const { data: { session: sessaoInicial } } = await supabase.auth.getSession();
-if (sessaoInicial) {
-  mostrarTelaLogada();
-} else {
-  mostrarTelaLogin();
 }
 
 // ========================================
@@ -1511,4 +1414,31 @@ document.addEventListener('keydown', (event) => {
     fecharControleMesas();
     controleMesasBtn.focus();
   }
+});
+
+// ========================================
+// BOOTSTRAP (fica por último de propósito — ver configurarLogin em auth.js)
+// ========================================
+
+await configurarLogin({
+  cliente: supabase,
+  conteudoEl: document.getElementById('balcaoConteudo'),
+  papeis: null,
+  aoEntrar: async () => {
+    await carregarTudoInicial();
+    inscreverRealtime();
+    iniciarPollingMesas();
+  },
+  aoSair: () => {
+    desinscreverRealtime();
+    pararPollingMesas();
+    pedidos = [];
+    fechamentos = [];
+    pagamentosPendentes = [];
+    mesasAtivas = [];
+    renderizarPedidos();
+    fechamentoGrid.innerHTML = '';
+    pagamentoGrid.innerHTML = '';
+    mesasAtivasGrid.innerHTML = '';
+  },
 });

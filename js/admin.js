@@ -7,17 +7,9 @@
 // supabase/003_admin.sql). Login sem o papel certo é barrado e deslogado.
 
 import { supabase } from './supabaseClient.js';
+import { configurarLogin } from './auth.js';
 import { formatarPreco, escaparTexto, escaparAtributo } from './shared.js';
 
-const loginTela = document.getElementById('loginTela');
-const loginForm = document.getElementById('loginForm');
-const loginEmailEl = document.getElementById('loginEmail');
-const loginSenhaEl = document.getElementById('loginSenha');
-const loginErroEl = document.getElementById('loginErro');
-const loginEntrarBtn = document.getElementById('loginEntrarBtn');
-
-const adminConteudo = document.getElementById('adminConteudo');
-const sairBtn = document.getElementById('sairBtn');
 
 const produtosCarregandoEl = document.getElementById('produtosCarregando');
 const produtosErroEl = document.getElementById('produtosErro');
@@ -41,110 +33,6 @@ const LABEL_CATEGORIA = {
   essencia: 'Essências',
 };
 const ORDEM_CATEGORIAS = ['drink', 'cerveja', 'sem_alcool', 'narguile', 'essencia'];
-
-// ========================================
-// LOGIN / LOGOUT (com checagem de papel admin)
-// ========================================
-
-function mostrarTelaLogin(mensagemErro) {
-  adminConteudo.style.display = 'none';
-  loginTela.style.display = 'flex';
-  loginEmailEl.value = '';
-  loginSenhaEl.value = '';
-
-  if (mensagemErro) {
-    loginErroEl.textContent = mensagemErro;
-    loginErroEl.style.display = 'block';
-  } else {
-    loginErroEl.style.display = 'none';
-  }
-}
-
-// Carrega os produtos só na primeira vez que o painel abre (evita recarregar
-// tudo de novo se onAuthStateChange disparar outra vez, ex.: refresh de token)
-let adminIniciado = false;
-
-async function mostrarPainelAdmin() {
-  loginTela.style.display = 'none';
-  adminConteudo.style.display = '';
-
-  if (adminIniciado) return;
-  adminIniciado = true;
-
-  await Promise.all([carregarProdutos(), carregarConfiguracoes()]);
-}
-
-// Verifica se a sessão logada pertence a um usuário com papel "admin" em
-// "perfis". Login com credenciais válidas mas sem esse papel é barrado aqui.
-async function verificarAdminEExibir(session) {
-  if (!session) {
-    mostrarTelaLogin();
-    return;
-  }
-
-  const { data: perfil, error } = await supabase
-    .from('perfis')
-    .select('papel')
-    .eq('user_id', session.user.id)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Erro ao verificar permissão de admin:', error);
-    mostrarTelaLogin('Não foi possível verificar sua permissão agora. Tente de novo.');
-    await supabase.auth.signOut();
-    return;
-  }
-
-  if (!perfil || perfil.papel !== 'admin') {
-    mostrarTelaLogin('Este usuário não tem permissão de administrador.');
-    await supabase.auth.signOut();
-    return;
-  }
-
-  mostrarPainelAdmin();
-}
-
-loginForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-
-  loginEntrarBtn.disabled = true;
-  loginEntrarBtn.textContent = 'Entrando...';
-  loginErroEl.style.display = 'none';
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: loginEmailEl.value.trim(),
-    password: loginSenhaEl.value,
-  });
-
-  loginEntrarBtn.disabled = false;
-  loginEntrarBtn.textContent = 'Entrar';
-
-  if (error) {
-    loginErroEl.textContent = 'E-mail ou senha inválidos.';
-    loginErroEl.style.display = 'block';
-    return;
-  }
-
-  await verificarAdminEExibir(data.session);
-});
-
-sairBtn.addEventListener('click', () => {
-  supabase.auth.signOut();
-});
-
-// Só reage a LOGOUT aqui — o login bem-sucedido já é tratado logo acima
-// (via verificarAdminEExibir), pra não checar o papel de novo a cada refresh
-// automático de token.
-supabase.auth.onAuthStateChange((_evento, session) => {
-  if (!session) {
-    adminIniciado = false;
-    mostrarTelaLogin();
-  }
-});
-
-// Checagem inicial explícita (a sessão persiste sozinha entre recarregamentos)
-const { data: { session: sessaoInicial } } = await supabase.auth.getSession();
-await verificarAdminEExibir(sessaoInicial);
 
 // ========================================
 // CARREGAMENTO / LISTAGEM DE PRODUTOS
@@ -703,4 +591,15 @@ configForm.addEventListener('submit', async (event) => {
     ? 'Salvo! Taxa de serviço desativada.'
     : 'Salvo com sucesso!';
   configFeedbackEl.className = 'admin-produto-card__feedback admin-produto-card__feedback--sucesso';
+});
+
+// ========================================
+// BOOTSTRAP (fica por último de propósito — ver configurarLogin em auth.js)
+// ========================================
+
+await configurarLogin({
+  cliente: supabase,
+  conteudoEl: document.getElementById('adminConteudo'),
+  papeis: ['admin'],
+  aoEntrar: () => Promise.all([carregarProdutos(), carregarConfiguracoes()]),
 });

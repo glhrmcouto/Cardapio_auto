@@ -105,7 +105,7 @@ Depois abra `http://localhost:8000/index.html` (ou `/balcao.html`,
 `/admin.html` etc.). Como não tem build, qualquer alteração num arquivo já
 aparece só recarregando a página.
 
-Isso usa o Supabase de produção configurado em `supabaseClient.js` (ver
+Isso usa o Supabase de produção configurado em `supabaseConfig.js` (ver
 [Onde ficam as credenciais](#onde-ficam-as-credenciais)) — não tem "banco
 local" separado. Para testar contra um projeto Supabase à parte (sandbox),
 troque `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY` nesse arquivo temporariamente.
@@ -148,7 +148,7 @@ Depois das migrações, crie os usuários de login:
    `003_admin.sql` pra cada usuário, trocando o e-mail e o papel
    (`'admin'` ou `'balcao'`) — sem essa linha o usuário loga mas o
    admin.html recusa mostrar qualquer coisa (login "sem permissão").
-3. Atualize `supabaseClient.js` com a `SUPABASE_URL` e a
+3. Atualize `js/supabaseConfig.js` com a `SUPABASE_URL` e a
    `SUPABASE_PUBLISHABLE_KEY` do **novo** projeto (painel → Project Settings
    → API) — essas duas trocam a cada projeto Supabase novo.
 
@@ -177,7 +177,7 @@ Depois das migrações, crie os usuários de login:
 
 | Credencial | Onde fica | Pode aparecer no repositório? |
 |---|---|---|
-| `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY` | `supabaseClient.js` | **Sim** — é a chave pública (antiga "anon key"), feita pra rodar no navegador de qualquer visitante. Sozinha não dá acesso a nada; quem protege os dados é o RLS configurado nas migrações `supabase/*.sql`. |
+| `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY` | `js/supabaseConfig.js` | **Sim** — é a chave pública (antiga "anon key"), feita pra rodar no navegador de qualquer visitante. Sozinha não dá acesso a nada; quem protege os dados é o RLS configurado nas migrações `supabase/*.sql`. |
 | Senha do banco Postgres / connection string completa | Só no secret `SUPABASE_DB_URL` do GitHub (Settings → Secrets and variables → Actions) | **Nunca**. Usada só pelo workflow de backup. Passo a passo de onde pegar e como cadastrar: ver o topo de `.github/workflows/backup.yml`. |
 | Login de admin/balcão (e-mail + senha) | Supabase Auth (painel → Authentication → Users) | Nunca — nem o hash de senha existe em lugar nenhum deste repositório. |
 | `service_role` (chave secreta do Supabase) | Não é usada em lugar nenhum deste projeto | **Nunca deveria aparecer aqui** — se algum dia for necessária pra algum script administrativo, trate como a connection string: só em secret, nunca commitada. |

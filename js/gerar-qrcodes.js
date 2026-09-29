@@ -8,16 +8,8 @@
 // supabase/005_seguranca.sql), então essa tela precisa do mesmo login.
 
 import { supabase } from './supabaseClient.js';
+import { configurarLogin } from './auth.js';
 
-const loginTela = document.getElementById('loginTela');
-const loginForm = document.getElementById('loginForm');
-const loginEmailEl = document.getElementById('loginEmail');
-const loginSenhaEl = document.getElementById('loginSenha');
-const loginErroEl = document.getElementById('loginErro');
-const loginEntrarBtn = document.getElementById('loginEntrarBtn');
-
-const qrPagina = document.getElementById('qrPagina');
-const sairBtn = document.getElementById('sairBtn');
 
 const qrCarregandoEl = document.getElementById('qrCarregando');
 const qrErroEl = document.getElementById('qrErro');
@@ -27,92 +19,6 @@ const qrVazioEl = document.getElementById('qrVazio');
 const qrGrid = document.getElementById('qrGrid');
 const qrImprimirBtn = document.getElementById('qrImprimirBtn');
 const qrRecarregarBtn = document.getElementById('qrRecarregarBtn');
-
-let paginaIniciada = false;
-
-// ========================================
-// LOGIN / LOGOUT (com checagem de papel admin)
-// ========================================
-
-function mostrarTelaLogin(mensagemErro) {
-  qrPagina.style.display = 'none';
-  loginTela.style.display = 'flex';
-  loginEmailEl.value = '';
-  loginSenhaEl.value = '';
-
-  if (mensagemErro) {
-    loginErroEl.textContent = mensagemErro;
-    loginErroEl.style.display = 'block';
-  } else {
-    loginErroEl.style.display = 'none';
-  }
-}
-
-function mostrarPagina() {
-  loginTela.style.display = 'none';
-  qrPagina.style.display = '';
-
-  if (paginaIniciada) return;
-  paginaIniciada = true;
-
-  carregarEGerarQrCodes();
-}
-
-async function verificarAdminEExibir(session) {
-  if (!session) {
-    mostrarTelaLogin();
-    return;
-  }
-
-  const { data: perfil, error } = await supabase
-    .from('perfis')
-    .select('papel')
-    .eq('user_id', session.user.id)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Erro ao verificar permissão de admin:', error);
-    mostrarTelaLogin('Não foi possível verificar sua permissão agora. Tente de novo.');
-    await supabase.auth.signOut();
-    return;
-  }
-
-  if (!perfil || perfil.papel !== 'admin') {
-    mostrarTelaLogin('Este usuário não tem permissão de administrador.');
-    await supabase.auth.signOut();
-    return;
-  }
-
-  mostrarPagina();
-}
-
-loginForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-
-  loginEntrarBtn.disabled = true;
-  loginEntrarBtn.textContent = 'Entrando...';
-  loginErroEl.style.display = 'none';
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: loginEmailEl.value.trim(),
-    password: loginSenhaEl.value,
-  });
-
-  loginEntrarBtn.disabled = false;
-  loginEntrarBtn.textContent = 'Entrar';
-
-  if (error) {
-    loginErroEl.textContent = 'E-mail ou senha inválidos.';
-    loginErroEl.style.display = 'block';
-    return;
-  }
-
-  await verificarAdminEExibir(data.session);
-});
-
-sairBtn.addEventListener('click', () => {
-  supabase.auth.signOut();
-});
 
 // ========================================
 // MESAS -> QR CODES
@@ -208,22 +114,12 @@ qrRecarregarBtn.addEventListener('click', carregarEGerarQrCodes);
 qrImprimirBtn.addEventListener('click', () => window.print());
 
 // ========================================
-// BOOTSTRAP (fica por último de propósito)
+// BOOTSTRAP (fica por último de propósito — ver configurarLogin em auth.js)
 // ========================================
-//
-// verificarAdminEExibir() dispara mostrarPagina() -> carregarEGerarQrCodes()
-// de forma síncrona (sem "await" no meio). Se esse bootstrap ficasse ANTES
-// das declarações acima, uma chamada síncrona poderia esbarrar numa delas
-// antes de ela ter rodado — o "await" no topo do módulo só suspende a
-// CONTINUAÇÃO do próprio módulo; tudo que vem depois dele só existe de fato
-// depois que essa promise resolve (mesmo erro já visto em relatorios.js).
 
-supabase.auth.onAuthStateChange((_evento, session) => {
-  if (!session) {
-    paginaIniciada = false;
-    mostrarTelaLogin();
-  }
+await configurarLogin({
+  cliente: supabase,
+  conteudoEl: document.getElementById('qrPagina'),
+  papeis: ['admin'],
+  aoEntrar: carregarEGerarQrCodes,
 });
-
-const { data: { session: sessaoInicial } } = await supabase.auth.getSession();
-await verificarAdminEExibir(sessaoInicial);
