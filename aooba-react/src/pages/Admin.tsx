@@ -245,7 +245,7 @@ function produtoParaRascunho(p: Produto): Rascunho {
   return { nome: p.nome, descricao: p.descricao, preco: formatarPreco(p.preco), categoria: p.categoria, ordem: String(p.ordem) };
 }
 
-export default function Admin() {
+function AdminConteudo() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
@@ -347,7 +347,7 @@ export default function Admin() {
   const categoriaInicial = ORDEM_CATEGORIAS[0];
 
   return (
-    <AdminLayout atual="admin" titulo="Administrador" docTitle="AOOBA! — Administrador">
+    <>
       <div className="admin-toolbar">
         <h1 className="admin-titulo">Cardápio</h1>
         <button type="button" className="btn btn--primary" onClick={() => setNovoAberto(true)}>
@@ -388,6 +388,14 @@ export default function Admin() {
         ))}
 
       <ConfigTaxa />
+    </>
+  );
+}
+
+export default function Admin() {
+  return (
+    <AdminLayout atual="admin" titulo="Administrador" docTitle="AOOBA! — Administrador">
+      <AdminConteudo />
     </AdminLayout>
   );
 }

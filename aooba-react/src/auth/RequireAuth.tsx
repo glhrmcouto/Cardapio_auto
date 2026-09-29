@@ -67,7 +67,7 @@ export function RequireAuth({
       if (vivo) void verificar(data.session);
     });
     const { data: sub } = cliente.auth.onAuthStateChange((_evento, session) => {
-      if (!session) setEstado({ tipo: 'login' });
+      if (!session) setEstado((e) => (e.tipo === 'login' ? e : { tipo: 'login' })); // não apaga a mensagem de erro do login
       else if (!papeis) setEstado({ tipo: 'ok', papel: null });
       // Com papéis, só reage a logout (evita reconsultar o papel a cada refresh de token).
     });

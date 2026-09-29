@@ -37,7 +37,7 @@ function QrCard({ mesa }: { mesa: MesaQr }) {
   );
 }
 
-export default function GerarQrCodes() {
+function QrConteudo() {
   const [mesas, setMesas] = useState<MesaQr[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
@@ -60,7 +60,7 @@ export default function GerarQrCodes() {
   }, [carregar]);
 
   return (
-    <AdminLayout atual="gerar-qrcodes" titulo="QR codes" docTitle="AOOBA! — Gerar QR codes">
+    <>
       <div className="admin-toolbar">
         <h1 className="admin-titulo">Gerar QR codes das mesas</h1>
         <div className="qr-acoes">
@@ -96,6 +96,14 @@ export default function GerarQrCodes() {
           <QrCard key={`${m.numero}-${m.token}`} mesa={m} />
         ))}
       </div>
+    </>
+  );
+}
+
+export default function GerarQrCodes() {
+  return (
+    <AdminLayout atual="gerar-qrcodes" titulo="QR codes" docTitle="AOOBA! — Gerar QR codes">
+      <QrConteudo />
     </AdminLayout>
   );
 }

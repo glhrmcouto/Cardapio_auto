@@ -24,7 +24,7 @@ cd aooba-react
 npm install
 cp .env.example .env     # VITE_SUPABASE_URL + VITE_SUPABASE_PUBLISHABLE_KEY
 npm run dev              # http://localhost:5173
-npm test                 # Vitest (79 testes)
+npm test                 # Vitest + MSW (197 testes)
 npm run typecheck
 npm run build            # tsc + vite build -> dist/
 ```
@@ -113,20 +113,46 @@ troque as duas variáveis no seu `.env` local (que é ignorado pelo git).
 
 ## 6. Testes
 
-Rode `npm test` (Vitest + Testing Library + jsdom). Setup em `src/test/setup.ts` (stubs de `IntersectionObserver` e
-`scrollIntoView`, que o jsdom não tem). `src/test/supabaseMock.ts` cria um cliente Supabase falso (`rpc`, `from` encadeável,
-`channel`, `auth`) — nos testes de componente faça `vi.mock('.../lib/supabase', ...)` apontando para ele.
+Rode `npm test` (Vitest + Testing Library + jsdom + **MSW**): **197 testes**, 15 arquivos.
+Setup em `src/test/setup.ts` (stubs de `IntersectionObserver`, `scrollIntoView`, `canvas` e `WebSocket`, que o jsdom não tem).
 
-**Coberto:** carrinho, decisões e storage da sessão, `contas.ts`, transições do balcão, intervalo do histórico, total do
-novo pedido, `RequireAuth` (papéis, login) e o Cardápio (acesso bloqueado, boas-vindas, mesa bloqueada, confirmar entrada,
-conta encerrada, carrinho, `criar_pedido`, `SESSAO_ENCERRADA`).
+### Duas camadas de teste de API
+1. **MSW (preferida)** — `src/test/msw.ts`. O cliente **real** do `supabase-js` faz HTTP e o MSW responde, então o teste
+   confere URL, método, filtros PostgREST e corpo de cada chamada. Qualquer requisição sem handler **falha** o teste
+   (`onUnhandledRequest: 'error'`). Helpers:
+   - `mockRpc(nome, resposta | (entrada) => resposta)` — `POST /rest/v1/rpc/<nome>`; devolva um valor ou `new ErroPg(msg, { details, code, status })`.
+   - `mockTabela(nome, { select, insert, update, delete })` — GET/POST/PATCH/DELETE de `/rest/v1/<tabela>`; respeita
+     `.single()/.maybeSingle()` (Accept `vnd.pgrst.object`) e `Prefer: return=representation`.
+   - `chamadasRpc(nome)` / `chamadasTabela(nome, método?)` — chamadas registradas (`body`, `query`, `search`).
+   - `logadoComo(papel, 'padrao' | 'garcom')` — sessão já logada no localStorage + papel em `perfis`;
+     `mockLogin(ok, papel)` — para testar o formulário de login.
+   - Realtime usa WebSocket e é substituído por uma classe inerte; **eventos em tempo real são cobertos pelas transições
+     puras** (`pages/balcao/transicoes.ts`), não por MSW.
+2. **Supabase falso por módulo** — `src/test/supabaseMock.ts` + `vi.mock`. Ficou nos testes antigos
+   (`RequireAuth.test.tsx`, `Cardapio.test.tsx`); pode ser migrado para MSW quando convier.
 
-**Falta cobrir (sugestão de ordem):**
-1. **Testes de contrato contra um banco real** (sandbox ou Supabase local com Docker rodando
-   `supabase/schema_completo.sql`): chamar as RPCs de verdade — abrir sessão, criar pedido, fechar parcial, confirmar
-   pagamento, encerrar (com e sem saldo), bloquear/liberar mesa, rate limit — e o RLS (anônimo **não** lê `pedidos` nem o
-   token de `mesas`). É o maior buraco hoje.
-2. Testes de página: Admin, Mesas, Relatórios, Balcão e Garçom inteiros.
+### O que está coberto
+| Arquivo de teste | Cobre |
+|---|---|
+| `pages/__tests__/Admin.api.test.tsx` | CRUD de produtos (PATCH/POST/DELETE, FK 23503, reordenar), taxa de serviço, login e papéis |
+| `pages/__tests__/Mesas.api.test.tsx` | mesas (criar, duplicada 23505, ativar, regerar token via RPC, copiar link) e QR codes |
+| `pages/__tests__/Relatorios.api.test.tsx` | 5 RPCs com intervalo de datas, cartões, gráficos, ordenação, CSV (BOM), backup ZIP, erros |
+| `pages/__tests__/Balcao.api.test.tsx` | carga inicial, entregar, remover item (senha), fechar conta (forçar saldo), pagamentos parciais, mesas ativas, histórico, controle de mesas |
+| `pages/__tests__/Garcom.api.test.tsx` | acesso por papel, sessão própria do garçom, mesas, novo pedido (`lancar_pedido_garcom`), ver/fechar conta, pedidos |
+| `pages/__tests__/Cardapio.api.test.tsx` | sessão da mesa, `criar_pedido` (token de sessão, narguilé dividido, sem preço no payload), conta, fechar parte/conta toda |
+| `lib/__tests__/*`, `pages/balcao/__tests__/*`, `pages/garcom/__tests__/*` | regras puras: carrinho, sessão, contas, transições, histórico, novo pedido |
+
+### Bugs que os testes com MSW encontraram (já corrigidos)
+- `Admin`, `Mesas` e `GerarQrCodes` **buscavam dados antes do login** (o efeito de carga ficava fora do `RequireAuth`). Agora o
+  conteúdo é um componente interno renderizado só depois de autenticado.
+- A mensagem "sem permissão" do login **sumia** logo após o logout automático (o `onAuthStateChange` sobrescrevia o erro).
+
+### Falta cobrir (sugestão de ordem)
+1. **Testes de contrato contra um banco real** (sandbox ou Supabase local com Docker rodando `supabase/schema_completo.sql`):
+   o MSW garante o que o front *envia* e como reage a respostas *simuladas*; não garante que o banco aceita/devolve isso.
+   Cubra as RPCs de verdade (abrir sessão, criar pedido, fechar parcial, confirmar pagamento, encerrar, bloquear/liberar,
+   rate limit) e o RLS (anônimo **não** lê `pedidos` nem o token de `mesas`).
+2. Validar os handlers do MSW contra as respostas reais (os formatos de `lib/types.ts` e dos mocks foram escritos à mão).
 3. E2E (Playwright) contra o banco de teste: QR → pedido → aparece no balcão → fechar conta.
 4. Gerar tipos com `supabase gen types` e trocar os de `lib/types.ts`.
 

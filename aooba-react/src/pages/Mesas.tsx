@@ -76,7 +76,7 @@ function MesaCard({
   );
 }
 
-export default function Mesas() {
+function MesasConteudo() {
   const [mesas, setMesas] = useState<MesaAdmin[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
@@ -139,7 +139,7 @@ export default function Mesas() {
   }
 
   return (
-    <AdminLayout atual="mesas" titulo="Mesas" docTitle="AOOBA! — Mesas">
+    <>
       <div className="admin-toolbar admin-toolbar--mesas">
         <h1 className="admin-titulo">Mesas</h1>
         <form className="admin-mesa-nova" onSubmit={adicionar}>
@@ -161,6 +161,14 @@ export default function Mesas() {
           )}
         </div>
       )}
+    </>
+  );
+}
+
+export default function Mesas() {
+  return (
+    <AdminLayout atual="mesas" titulo="Mesas" docTitle="AOOBA! — Mesas">
+      <MesasConteudo />
     </AdminLayout>
   );
 }

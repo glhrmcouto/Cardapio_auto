@@ -10,7 +10,7 @@ npm install
 cp .env.example .env      # URL + chave publicável do Supabase (pública por design; nunca a service_role)
 npm run dev               # http://localhost:5173
 npm run build             # tsc + vite build -> dist/
-npm test                  # Vitest (79 testes)
+npm test                  # Vitest + MSW (197 testes)
 npm run typecheck
 ```
 
@@ -39,18 +39,21 @@ src/
   components/   Modal, Toast, AdminLayout, ContaViews, ConfirmarSenha, Feedback
   pages/        uma por tela; balcao/, garcom/, cardapio/ com os subcomponentes
   styles/       CSS original, reaproveitado sem mudanças
-  test/         setup do Vitest e Supabase falso
+  test/         setup do Vitest, MSW (API mockada) e helpers
 ```
 
 ## Testes
 
-- **Unitários (puros):** carrinho, decisões da sessão da mesa, storage, transições de Realtime do balcão, encerrar sessão (com/sem saldo), histórico, novo pedido.
-- **Componente/integração:** `RequireAuth` (papéis, login) e Cardápio (acesso bloqueado, boas-vindas, mesa bloqueada, confirmar entrada, conta encerrada, carrinho, criar_pedido, `SESSAO_ENCERRADA`).
-- Ainda **não cobertos**: telas admin/mesas/relatórios, Balcão e Garçom como página inteira, e um teste E2E contra um Supabase real (sugestão: Playwright num projeto Supabase de sandbox).
+`npm test` — Vitest + Testing Library + **MSW**. As chamadas ao Supabase são interceptadas por HTTP (o cliente real do
+`supabase-js` roda), e os testes conferem URL, filtros e corpo de cada requisição. Detalhes, helpers (`mockRpc`,
+`mockTabela`, `logadoComo`...) e o que falta cobrir: ver `REFATORACAO.md` seção 6.
+
+- **Coberto:** todas as telas (cardápio, balcão, garçom, admin, mesas, relatórios, QR codes) + regras puras.
+- **Ainda não coberto:** contrato contra um banco real (RPCs/RLS) e E2E.
 
 ## Pendências / atenção
 
-- Não testei contra o Supabase real nem no navegador; validado por `tsc`, `vite build` e Vitest com Supabase falso. Faça um teste manual de cada fluxo antes de publicar.
+- Não testei contra o Supabase real nem no navegador; validado por `tsc`, `vite build` e Vitest com a API mockada (MSW). Faça um teste manual de cada fluxo antes de publicar.
 - `window.alert/confirm` nativos foram mantidos como no original.
 - O CSS de todas as telas é global depois de carregado (como antes, cada tela importa o seu).
 - Se o bar trocar de domínio, atualize as tags Open Graph/canonical em `index.html`.
