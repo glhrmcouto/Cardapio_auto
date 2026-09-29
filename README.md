@@ -67,6 +67,7 @@ js/
   admin.js                      → lógica do painel do dono (cardápio + mesas)
   relatorios.js                 → lógica do painel de relatórios
   gerar-qrcodes.js               → lógica do gerador de QR code
+  auth.js                       → login/logout das telas restritas (balcão, admin, relatórios, QR codes)
   shared.js                     → funções compartilhadas entre os .js acima
   supabaseClient.js             → cliente único do Supabase (URL + chave pública)
 css/
