@@ -11,7 +11,7 @@
 
 import { supabase } from './supabaseClient.js';
 import { configurarLogin } from './auth.js';
-import { formatarPreco, escaparTexto } from './shared.js';
+import { formatarPreco, escaparTexto, mostrarToast } from './shared.js';
 
 // ========================================
 // ELEMENTOS
@@ -37,18 +37,6 @@ const historicoVazio = document.getElementById('historicoVazio');
 const historicoClose = document.getElementById('historicoClose');
 const historicoFiltroData = document.getElementById('historicoFiltroData');
 const historicoFiltroLimpar = document.getElementById('historicoFiltroLimpar');
-
-const toastEl = document.getElementById('toast');
-
-// Aviso discreto no rodapé (mesmo padrão de js/script.js) — usado hoje só
-// pro encerramento automático de sessão (ver confirmarRecebimentoPagamento
-// e supabase/015_encerramento_automatico.sql).
-function mostrarToast(mensagem) {
-  toastEl.textContent = mensagem;
-  toastEl.classList.add('show');
-  clearTimeout(mostrarToast._timer);
-  mostrarToast._timer = setTimeout(() => toastEl.classList.remove('show'), 3500);
-}
 
 const STATUS_LABEL_PESSOA = { em_aberto: 'Em aberto', aguardando: 'Aguardando', pago: 'Pago' };
 

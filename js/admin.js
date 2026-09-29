@@ -8,7 +8,7 @@
 
 import { supabase } from './supabaseClient.js';
 import { configurarLogin } from './auth.js';
-import { formatarPreco, escaparTexto, escaparAtributo } from './shared.js';
+import { formatarPreco, escaparTexto, escaparAtributo, LABEL_CATEGORIA, ORDEM_CATEGORIAS } from './shared.js';
 
 
 const produtosCarregandoEl = document.getElementById('produtosCarregando');
@@ -31,15 +31,6 @@ const configTentarBtn = document.getElementById('configTentar');
 const configForm = document.getElementById('configForm');
 const taxaServicoInputEl = document.getElementById('taxaServicoInput');
 const configFeedbackEl = document.getElementById('configFeedback');
-
-const LABEL_CATEGORIA = {
-  drink: 'Drinks',
-  cerveja: 'Cervejas',
-  sem_alcool: 'Sem Álcool',
-  narguile: 'Narguilé',
-  essencia: 'Essências',
-};
-const ORDEM_CATEGORIAS = ['drink', 'cerveja', 'sem_alcool', 'narguile', 'essencia'];
 
 // ========================================
 // CARREGAMENTO / LISTAGEM DE PRODUTOS
