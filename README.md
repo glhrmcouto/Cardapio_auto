@@ -71,7 +71,8 @@ js/
   shared.js                     → funções compartilhadas entre os .js acima
   supabaseClient.js             → cliente único do Supabase (URL + chave pública)
 css/
-  style.css                     → estilos globais (variáveis de marca, componentes reaproveitados)
+  base.css                      → estilos compartilhados (variáveis de marca, header, botões, toast, modal, login)
+  cardapio.css                  → estilos só do cardápio público (index.html)
   admin.css / balcao.css / relatorios.css / gerar-qrcodes.css
                                  → estilos específicos de cada painel
 img/                            → logo e imagens usadas no site
