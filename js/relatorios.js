@@ -11,7 +11,7 @@
 
 import { supabase } from './supabaseClient.js';
 import { configurarLogin } from './auth.js';
-import { formatarPreco, escaparTexto, formatarDataISO } from './shared.js';
+import { formatarPreco, escaparTexto, formatarDataISO, LABEL_CATEGORIA, ORDEM_CATEGORIAS } from './shared.js';
 
 
 const relatorioCarregandoEl = document.getElementById('relatorioCarregando');
@@ -34,15 +34,6 @@ const picoHorarioEl = document.getElementById('picoHorario');
 const exportarCsvBtn = document.getElementById('exportarCsvBtn');
 
 const backupBtn = document.getElementById('backupBtn');
-
-const LABEL_CATEGORIA = {
-  drink: 'Drinks',
-  cerveja: 'Cervejas',
-  sem_alcool: 'Sem Álcool',
-  narguile: 'Narguilé',
-  essencia: 'Essências',
-};
-const ORDEM_CATEGORIAS = ['drink', 'cerveja', 'sem_alcool', 'narguile', 'essencia'];
 
 // Paleta categórica validada (CVD-safe) pra 5 séries num surface escuro
 // (#161616) — ver skill de dataviz. A ordem importa: é o que garante a

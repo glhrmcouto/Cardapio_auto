@@ -65,7 +65,7 @@
 // localStorage.
 import { supabase } from './supabaseClientGarcom.js';
 import { configurarLogin } from './auth.js';
-import { formatarPreco, escaparTexto } from './shared.js';
+import { formatarPreco, escaparTexto, mostrarToast, LABEL_CATEGORIA, ORDEM_CATEGORIAS } from './shared.js';
 
 
 const abaMesas = document.getElementById('abaMesas');
@@ -73,7 +73,6 @@ const abaPedidos = document.getElementById('abaPedidos');
 const tabMesasBtn = document.getElementById('tabMesasBtn');
 const tabPedidosBtn = document.getElementById('tabPedidosBtn');
 
-const toastEl = document.getElementById('toast');
 
 const mesasCarregandoEl = document.getElementById('mesasCarregando');
 const mesasErroEl = document.getElementById('mesasErro');
@@ -142,13 +141,6 @@ tabPedidosBtn.addEventListener('click', () => mostrarAba('pedidos'));
 // ========================================================================
 // TOAST (aviso discreto — mesmo padrão de js/balcao.js)
 // ========================================================================
-
-function mostrarToast(mensagem) {
-  toastEl.textContent = mensagem;
-  toastEl.classList.add('show');
-  clearTimeout(mostrarToast._timer);
-  mostrarToast._timer = setTimeout(() => toastEl.classList.remove('show'), 3500);
-}
 
 // ========================================================================
 // ABA MESAS — lista, ações por mesa e em massa (reaproveita listar_mesas_balcao,
@@ -457,15 +449,6 @@ bloquearTodasBtn.addEventListener('click', bloquearTodasMesas);
 // (renderizarMesas acima); a RPC também restringe por conta própria, então
 // mesmo alguém forçando a chamada via console não passa sem esse papel.
 // ========================================================================
-
-const LABEL_CATEGORIA = {
-  drink: 'Drinks',
-  cerveja: 'Cervejas',
-  sem_alcool: 'Sem Álcool',
-  narguile: 'Narguilé',
-  essencia: 'Essências',
-};
-const ORDEM_CATEGORIAS = ['drink', 'cerveja', 'sem_alcool', 'narguile', 'essencia'];
 
 let produtosCardapio = [];   // [{id, nome, preco, categoria}] — só ativo=true
 let produtosCarregados = false;

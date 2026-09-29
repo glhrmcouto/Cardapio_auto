@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient.js';
-import { formatarPreco, escaparTexto } from './shared.js';
+import { formatarPreco, escaparTexto, mostrarToast, STATUS_LABEL_PESSOA } from './shared.js';
 
 // ========================================
 // AVISO DE SEM CONEXÃO
@@ -838,7 +838,6 @@ const cartEmptyEl = document.getElementById('cartEmpty');
 const cartTotalEl = document.getElementById('cartTotal');
 const cartSubmit = document.getElementById('cartSubmit');
 const cartSubmitTextoOriginal = cartSubmit.textContent;
-const toastEl = document.getElementById('toast');
 
 function abrirCarrinho() {
   cartPanel.classList.add('is-open');
@@ -940,21 +939,11 @@ document.addEventListener('click', (event) => {
   adicionarAoCarrinho(Number(botao.dataset.produtoId), botao.dataset.nome, parseFloat(botao.dataset.preco), compartilhado);
 });
 
-// Mostra uma mensagem rápida no rodapé da tela — usada pros avisos em geral
-// (erros, "fechar minha parte", etc.). A confirmação de "pedido enviado" NÃO
-// usa mais isso: ver mostrarPedidoConfirmado, logo abaixo.
-function mostrarToast(mensagem) {
-  toastEl.textContent = mensagem;
-  toastEl.classList.add('show');
-  clearTimeout(mostrarToast._timer);
-  mostrarToast._timer = setTimeout(() => toastEl.classList.remove('show'), 3500);
-}
-
 // ========================================
 // CONFIRMAÇÃO CENTRAL DE PEDIDO ENVIADO
 // ========================================
 //
-// Diferente do toast de rodapé (mostrarToast, acima): "Pedido enviado" pedia
+// Diferente do toast de rodapé (mostrarToast, em shared.js): "Pedido enviado" pedia
 // destaque forte, então sobe centralizada, com fundo escurecido atrás — ver
 // .pedido-confirmado-overlay em css/style.css. Some sozinha depois de
 // alguns segundos ou ao toque em qualquer lugar do overlay.
@@ -1075,8 +1064,6 @@ mesaInput.addEventListener('input', () => {
 // de cada pessoa). Os dois vêm de uma chamada só à RPC conta_da_mesa (ver
 // supabase/009_fechamento_parcial.sql), passando o cliente_id pra receber
 // também o bloco "minha_parte".
-
-const STATUS_LABEL_PESSOA = { em_aberto: 'Em aberto', aguardando: 'Aguardando', pago: 'Pago' };
 
 const fecharContaBtn = document.getElementById('fecharContaBtn');
 const fecharContaOverlay = document.getElementById('fecharContaOverlay');

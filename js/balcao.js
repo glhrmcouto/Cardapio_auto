@@ -11,7 +11,7 @@
 
 import { supabase } from './supabaseClient.js';
 import { configurarLogin } from './auth.js';
-import { formatarPreco, escaparTexto } from './shared.js';
+import { formatarPreco, escaparTexto, mostrarToast, STATUS_LABEL_PESSOA } from './shared.js';
 
 // ========================================
 // ELEMENTOS
@@ -47,7 +47,6 @@ const historicoClose = document.getElementById('historicoClose');
 const historicoFiltroData = document.getElementById('historicoFiltroData');
 const historicoFiltroLimpar = document.getElementById('historicoFiltroLimpar');
 
-const toastEl = document.getElementById('toast');
 
 const confirmarSenhaOverlay = document.getElementById('confirmarSenhaOverlay');
 const confirmarSenhaModal = document.getElementById('confirmarSenhaModal');
@@ -55,18 +54,6 @@ const confirmarSenhaInput = document.getElementById('confirmarSenhaInput');
 const confirmarSenhaAviso = document.getElementById('confirmarSenhaAviso');
 const confirmarSenhaCancelar = document.getElementById('confirmarSenhaCancelar');
 const confirmarSenhaOk = document.getElementById('confirmarSenhaOk');
-
-// Aviso discreto no rodapé (mesmo padrão de js/script.js) — usado hoje só
-// pro encerramento automático de sessão (ver confirmarRecebimentoPagamento
-// e supabase/015_encerramento_automatico.sql).
-function mostrarToast(mensagem) {
-  toastEl.textContent = mensagem;
-  toastEl.classList.add('show');
-  clearTimeout(mostrarToast._timer);
-  mostrarToast._timer = setTimeout(() => toastEl.classList.remove('show'), 3500);
-}
-
-const STATUS_LABEL_PESSOA = { em_aberto: 'Em aberto', aguardando: 'Aguardando', pago: 'Pago' };
 
 let pedidos = []; // só os pedidos com status "pendente" — cada um já vem com .itens embutido
 let fechamentos = []; // pedidos de "fechar conta" (mesa inteira) ainda não atendidos

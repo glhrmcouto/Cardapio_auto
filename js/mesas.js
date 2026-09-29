@@ -9,7 +9,7 @@
 
 import { supabase } from './supabaseClient.js';
 import { configurarLogin } from './auth.js';
-import { escaparAtributo } from './shared.js';
+import { escaparAtributo, montarUrlMesa, mostrarFeedback } from './shared.js';
 
 
 const mesasCarregandoEl = document.getElementById('mesasCarregando');
@@ -18,22 +18,6 @@ const mesasTentarBtn = document.getElementById('mesasTentar');
 const mesasContainer = document.getElementById('mesasContainer');
 const novaMesaForm = document.getElementById('novaMesaForm');
 const novaMesaNumeroEl = document.getElementById('novaMesaNumero');
-
-// ========================================
-// FEEDBACK DE SALVAR (sucesso/erro, some sozinho depois de alguns segundos)
-// ========================================
-
-function mostrarFeedback(card, mensagem, tipo) {
-  const feedbackEl = card.querySelector('.admin-produto-card__feedback');
-  feedbackEl.textContent = mensagem;
-  feedbackEl.classList.remove('admin-produto-card__feedback--sucesso', 'admin-produto-card__feedback--erro');
-  feedbackEl.classList.add(tipo === 'sucesso' ? 'admin-produto-card__feedback--sucesso' : 'admin-produto-card__feedback--erro');
-
-  clearTimeout(feedbackEl._timer);
-  feedbackEl._timer = setTimeout(() => {
-    feedbackEl.textContent = '';
-  }, 4000);
-}
 
 // ========================================
 // MESAS (token do QR code — ver supabase/005_seguranca.sql)
@@ -70,13 +54,6 @@ async function carregarMesas() {
 }
 
 mesasTentarBtn.addEventListener('click', carregarMesas);
-
-// Monta a URL exata que deve virar QR code, a partir do próprio domínio em
-// que a página está rodando — assim funciona igual em localhost, no
-// preview do Netlify e no domínio final, sem precisar fixar nada aqui.
-function montarUrlMesa(mesa) {
-  return `${window.location.origin}/index.html?mesa=${mesa.numero}&t=${mesa.token}`;
-}
 
 function renderizarMesaCard(mesa) {
   const statusClasse = mesa.ativa ? 'admin-produto-card__status--ativo' : 'admin-produto-card__status--inativo';

@@ -8,7 +8,7 @@
 
 import { supabase } from './supabaseClient.js';
 import { configurarLogin } from './auth.js';
-import { formatarPreco, escaparTexto, escaparAtributo } from './shared.js';
+import { formatarPreco, escaparTexto, escaparAtributo, LABEL_CATEGORIA, ORDEM_CATEGORIAS, mostrarFeedback } from './shared.js';
 
 
 const produtosCarregandoEl = document.getElementById('produtosCarregando');
@@ -24,15 +24,6 @@ const configTentarBtn = document.getElementById('configTentar');
 const configForm = document.getElementById('configForm');
 const taxaServicoInputEl = document.getElementById('taxaServicoInput');
 const configFeedbackEl = document.getElementById('configFeedback');
-
-const LABEL_CATEGORIA = {
-  drink: 'Drinks',
-  cerveja: 'Cervejas',
-  sem_alcool: 'Sem Álcool',
-  narguile: 'Narguilé',
-  essencia: 'Essências',
-};
-const ORDEM_CATEGORIAS = ['drink', 'cerveja', 'sem_alcool', 'narguile', 'essencia'];
 
 // ========================================
 // CARREGAMENTO / LISTAGEM DE PRODUTOS
@@ -170,22 +161,6 @@ function formatarComoMascaraPreco(valorBruto) {
 function precoMascaradoParaNumero(valorMascarado) {
   const digitos = valorMascarado.replace(/\D/g, '');
   return parseInt(digitos || '0', 10) / 100;
-}
-
-// ========================================
-// FEEDBACK DE SALVAR (sucesso/erro, some sozinho depois de alguns segundos)
-// ========================================
-
-function mostrarFeedback(card, mensagem, tipo) {
-  const feedbackEl = card.querySelector('.admin-produto-card__feedback');
-  feedbackEl.textContent = mensagem;
-  feedbackEl.classList.remove('admin-produto-card__feedback--sucesso', 'admin-produto-card__feedback--erro');
-  feedbackEl.classList.add(tipo === 'sucesso' ? 'admin-produto-card__feedback--sucesso' : 'admin-produto-card__feedback--erro');
-
-  clearTimeout(feedbackEl._timer);
-  feedbackEl._timer = setTimeout(() => {
-    feedbackEl.textContent = '';
-  }, 4000);
 }
 
 // ========================================
