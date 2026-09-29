@@ -26,8 +26,10 @@ modo quiosque, veja o [BALCAO.md](BALCAO.md).
 | Página | Pra quem | O que faz |
 |---|---|---|
 | `index.html` | Cliente (público, via QR code da mesa) | Cardápio, carrinho, envio de pedido e pedido de fechamento de conta |
-| `balcao.html` | Garçom/balcão (login) | Fila de pedidos em tempo real, alertas de fechar conta, histórico |
-| `admin.html` | Dono (login, papel admin) | Editar cardápio (produtos) e gerenciar mesas (ativar/desativar, token do QR code) |
+| `balcao.html` | Balcão (login) | Fila de pedidos em tempo real, alertas de fechar conta, mesas ativas, controle de mesas, histórico |
+| `garcom.html` | Garçom no salão (login, papel garcom/balcao/admin) | Painel pro celular: mesas (liberar/bloquear, ver/fechar conta), pedidos pendentes e lançar pedido sem QR code |
+| `admin.html` | Dono (login, papel admin) | Editar cardápio (produtos) e a taxa de serviço |
+| `mesas.html` | Dono (login, papel admin) | Gerenciar mesas: criar, ativar/desativar, link e token do QR code |
 | `relatorios.html` | Dono (login, papel admin) | Faturamento, produtos mais vendidos, ticket médio, horário de pico, backup de dados |
 | `gerar-qrcodes.html` | Dono (login, papel admin) | Gera um QR code por mesa ativa, pronto pra imprimir e colar |
 | `404.html` | — | Página de erro 404 personalizada (Netlify serve automaticamente) |
@@ -36,10 +38,12 @@ modo quiosque, veja o [BALCAO.md](BALCAO.md).
 
 - **Frontend**: HTML + CSS + JavaScript puro (sem framework, sem build —
   cada página é um arquivo `.html` carregando seu próprio `.js` como módulo
-  ES). `shared.js` guarda funções pequenas repetidas entre as páginas
-  (formatação de preço, escape de texto, data local).
+  ES). Páginas maiores dividem o código em módulos numa pasta com o nome
+  delas (`js/cardapio/`, `js/balcao/`, `js/garcom/`, `js/admin/`); o que é
+  usado por várias páginas fica em `js/` (login em `auth.js`, controle de
+  mesas em `controle-mesas.js`, utilitários em `shared.js`).
 - **Backend**: [Supabase](https://supabase.com) — Postgres (com Row Level
-  Security), Auth (login de balcão/admin), Realtime (pedidos aparecendo na
+  Security), Auth (login de balcão/garçom/admin), Realtime (pedidos aparecendo na
   hora no balcão) e funções RPC (`supabase/*.sql`) pra qualquer escrita/leitura
   sensível.
 - **Bibliotecas de terceiros** (via CDN, sem `npm install`): Chart.js
@@ -57,31 +61,36 @@ Não tem `package.json` de propósito — não tem nada pra instalar ou buildar.
 ```
 index.html                      → cardápio público
 balcao.html                     → painel do balcão
-admin.html                      → painel do dono (cardápio + mesas)
+garcom.html                     → painel do garçom (celular)
+admin.html                      → painel do dono (cardápio + taxa de serviço)
+mesas.html                      → painel do dono (mesas e tokens do QR code)
 relatorios.html                 → painel do dono (vendas + backup manual)
 gerar-qrcodes.html              → gerador de QR code das mesas
 404.html                        → página de erro personalizada
 js/
-  script.js                     → lógica do cardápio público (index.html)
-  balcao.js                     → lógica do painel do balcão
-  admin.js                      → lógica do painel do dono (cardápio + mesas)
-  relatorios.js                 → lógica do painel de relatórios
-  gerar-qrcodes.js               → lógica do gerador de QR code
-  shared.js                     → funções compartilhadas entre os .js acima
-  supabaseClient.js             → cliente único do Supabase (URL + chave pública)
+  script.js + cardapio/         → cardápio público: script.js só importa os módulos, na ordem de inicialização
+  balcao.js + balcao/           → painel do balcão: balcao.js faz login/bootstrap, um módulo por painel
+  garcom.js + garcom/           → painel do garçom: garcom.js faz abas/login/bootstrap, um módulo por aba
+  admin.js + admin/             → painel do dono (produtos; configurações em admin/config.js)
+  mesas.js                      → gerenciamento de mesas
+  relatorios.js                 → painel de relatórios
+  gerar-qrcodes.js              → gerador de QR code
+  auth.js                       → login/logout de todas as telas restritas
+  controle-mesas.js             → ações de mesa compartilhadas por balcão e garçom
+  shared.js                     → utilitários compartilhados (preço, escape, toast, categorias...)
+  supabaseConfig.js             → URL + chave pública do projeto Supabase
+  supabaseClient.js             → cliente do Supabase usado por quase todas as telas
+  supabaseClientGarcom.js       → cliente separado do garçom (sessão de login própria)
 css/
-  style.css                     → estilos globais (variáveis de marca, componentes reaproveitados)
-  admin.css / balcao.css / relatorios.css / gerar-qrcodes.css
+  base.css                      → estilos compartilhados (variáveis de marca, header, botões, toast, modais, login)
+  cardapio.css                  → estilos só do cardápio público (index.html)
+  admin.css / balcao.css / garcom.css / relatorios.css / gerar-qrcodes.css
                                  → estilos específicos de cada painel
 img/                            → logo e imagens usadas no site
 supabase/
-  001_schema.sql                → tabelas produtos/pedidos/pedido_itens + RPCs públicas (criar_pedido, pedir_fechamento, conta_da_mesa)
-  002_realtime.sql               → habilita Realtime na tabela "pedidos"
-  003_admin.sql                  → tabela "perfis" (papel admin/balcão) + RLS de escrita em produtos
-  004_relatorios.sql             → RPCs de relatório (admin-only)
-  005_seguranca.sql              → tabela "mesas" (token por QR code) + limites de abuso nos pedidos
-  006_taxa_servico.sql           → taxa de serviço (10%) no fechamento de conta
-  007_token_conta_mesa.sql       → exige o token da mesa também em conta_da_mesa
+  001_schema.sql .. 024_*.sql   → migrações, em ordem (ver "Como configurar o Supabase do zero")
+  schema_completo.sql           → estado final de todas as migrações num arquivo só (instalação nova)
+  ferramentas/gerar_schema_completo.mjs → gera e confere o schema_completo.sql
 .github/workflows/backup.yml    → backup diário automático (pg_dump)
 BALCAO.md                       → configurar o PC do balcão em modo quiosque
 MANUAL.md                       → manual de uso pro dono/garçons, sem jargão técnico
@@ -113,41 +122,46 @@ troque `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY` nesse arquivo temporariamente.
 ## Como configurar o Supabase do zero
 
 Se for montar o projeto do zero (novo bar, ou recuperando de um backup),
-rode as migrações do `supabase/`, **nessa ordem**, no **SQL Editor** do
-painel do Supabase (`supabase.com/dashboard` → seu projeto → SQL Editor):
+rode **um arquivo só** no **SQL Editor** do painel do Supabase
+(`supabase.com/dashboard` → seu projeto → SQL Editor):
 
-1. **`001_schema.sql`** — cria as tabelas `produtos`, `pedidos`,
-   `pedido_itens`, o RLS básico e as RPCs públicas que o cardápio usa
-   (`criar_pedido`, `pedir_fechamento`, `conta_da_mesa`). Já vem com os
-   produtos/preços do cardápio original como seed — edite a lista de
-   `insert into produtos` no final do arquivo antes de rodar se for um
-   cardápio diferente.
-2. **`002_realtime.sql`** — sem isso o balcão não recebe pedido nenhum em
-   tempo real (a assinatura Realtime fica "pendurada" sem nunca disparar).
-3. **`003_admin.sql`** — cria a tabela `perfis` (quem é admin, quem é
-   balcão) e libera admin.html pra editar produtos. **No final do arquivo**
-   tem um `insert` comentado — troque o e-mail pelo e-mail de um usuário
-   real e rode-o (ver passo seguinte).
-4. **`004_relatorios.sql`** — as RPCs por trás de `relatorios.html`.
-5. **`005_seguranca.sql`** — cria a tabela `mesas` (token secreto por QR
-   code) e adiciona limite de frequência/tamanho nos pedidos. **Ajuste o
-   `generate_series(1, 20)` do seed** pro número real de mesas do bar antes
-   de rodar (ou pule o seed e cadastre as mesas uma a uma pelo admin.html).
-6. **`006_taxa_servico.sql`** — adiciona os 10% de taxa de serviço ao
-   fechamento de conta (só ali, não nos pedidos individuais).
-7. **`007_token_conta_mesa.sql`** — fecha o mesmo tipo de proteção da 005
-   (token da mesa) na consulta de conta usada no botão "Fechar Conta" do
-   cliente.
+- **`supabase/schema_completo.sql`** — cria tudo de uma vez: tabelas, RLS,
+  RPCs, Realtime, a configuração da taxa de serviço (10%), o cardápio de
+  exemplo e as mesas 1 a 20 (cada uma com seu token). Antes de rodar, se
+  for outro bar, ajuste no fim do arquivo os `INSERT INTO public.produtos`
+  e o `generate_series(1, 20)` das mesas (ou deixe como está e edite tudo
+  depois pelo admin.html / mesas.html).
 
-Depois das migrações, crie os usuários de login:
+As mesas **nascem bloqueadas** (ver `021_mesa_inicia_bloqueada.sql`): antes
+do primeiro pedido, libere pelo Controle de Mesas do balcão ou pela aba
+Mesas do garçom ("Liberar todas" serve pra abrir o salão).
+
+O `schema_completo.sql` é o resultado de aplicar as migrações
+`supabase/0*.sql` em ordem numérica, gerado e conferido automaticamente —
+rodar as migrações uma a uma dá exatamente o mesmo banco. **Num banco que
+já está em uso, nunca rode o `schema_completo.sql`**: aplique só as
+migrações novas, em ordem.
+
+**Criou uma migração nova?** Rode o gerador de novo e commite as duas coisas
+juntas (precisa de Node 20+; não instala nada no projeto):
+
+```bash
+cd supabase/ferramentas
+npm install --no-save @electric-sql/pglite @electric-sql/pglite-tools
+node gerar_schema_completo.mjs
+```
+
+Depois de criar o banco, crie os usuários de login:
 
 1. No painel do Supabase → **Authentication** → **Users** → **Add user** →
-   crie um usuário pra quem vai logar no admin (e-mail + senha) e, se quiser
-   um login separado só pro balcão, outro usuário.
+   crie um usuário pra quem vai logar no admin (e-mail + senha) e, se quiser,
+   logins separados pro balcão e pros garçons.
 2. No **SQL Editor**, rode o `insert into perfis (...)` do final de
    `003_admin.sql` pra cada usuário, trocando o e-mail e o papel
-   (`'admin'` ou `'balcao'`) — sem essa linha o usuário loga mas o
-   admin.html recusa mostrar qualquer coisa (login "sem permissão").
+   (`'admin'`, `'balcao'` ou `'garcom'`) — sem essa linha o usuário loga
+   mas as telas que exigem papel recusam mostrar qualquer coisa (login "sem
+   permissão"). Só o papel `'garcom'` pode lançar pedido sem QR code no
+   garcom.html.
 3. Atualize `js/supabaseConfig.js` com a `SUPABASE_URL` e a
    `SUPABASE_PUBLISHABLE_KEY` do **novo** projeto (painel → Project Settings
    → API) — essas duas trocam a cada projeto Supabase novo.
