@@ -1,5 +1,5 @@
 // ========================================
-// PAINEL ADMIN — edição do cardápio (produtos)
+// PAINEL ADMIN — edição do cardápio (produtos) e configurações
 // ========================================
 //
 // Exige duas coisas pra mostrar qualquer coisa: sessão autenticada (Supabase
@@ -8,8 +8,8 @@
 
 import { supabase } from './supabaseClient.js';
 import { configurarLogin } from './auth.js';
+import { carregarConfiguracoes } from './admin/config.js';
 import { formatarPreco, escaparTexto, escaparAtributo, LABEL_CATEGORIA, ORDEM_CATEGORIAS, mostrarFeedback } from './shared.js';
-
 
 const produtosCarregandoEl = document.getElementById('produtosCarregando');
 const produtosErroEl = document.getElementById('produtosErro');
@@ -17,13 +17,6 @@ const produtosTentarBtn = document.getElementById('produtosTentar');
 const categoriasContainer = document.getElementById('categoriasContainer');
 const adicionarProdutoBtn = document.getElementById('adicionarProdutoBtn');
 const novoProdutoContainer = document.getElementById('novoProdutoContainer');
-
-const configCarregandoEl = document.getElementById('configCarregando');
-const configErroEl = document.getElementById('configErro');
-const configTentarBtn = document.getElementById('configTentar');
-const configForm = document.getElementById('configForm');
-const taxaServicoInputEl = document.getElementById('taxaServicoInput');
-const configFeedbackEl = document.getElementById('configFeedback');
 
 // ========================================
 // CARREGAMENTO / LISTAGEM DE PRODUTOS
@@ -164,10 +157,13 @@ function precoMascaradoParaNumero(valorMascarado) {
 }
 
 // ========================================
-// SALVAR EDIÇÃO INLINE
+// LEITURA + VALIDAÇÃO DOS CAMPOS DE UM CARD (editar ou criar)
 // ========================================
+//
+// Devolve { nome, descricao, preco, categoria, ordem } ou null — nesse caso
+// já mostrou no próprio card qual campo está inválido.
 
-async function salvarProduto(id, card) {
+function lerCamposProduto(card) {
   const nome = card.querySelector('[data-campo="nome"]').value.trim();
   const descricao = card.querySelector('[data-campo="descricao"]').value.trim();
   const precoTexto = card.querySelector('[data-campo="preco"]').value;
@@ -179,16 +175,28 @@ async function salvarProduto(id, card) {
 
   if (!nome) {
     mostrarFeedback(card, 'O nome não pode ficar vazio.', 'erro');
-    return;
+    return null;
   }
   if (!Number.isFinite(preco) || preco < 0) {
     mostrarFeedback(card, 'Preço inválido.', 'erro');
-    return;
+    return null;
   }
   if (!Number.isFinite(ordem) || ordem < 0) {
     mostrarFeedback(card, 'Ordem inválida.', 'erro');
-    return;
+    return null;
   }
+
+  return { nome, descricao, preco, categoria, ordem };
+}
+
+// ========================================
+// SALVAR EDIÇÃO INLINE
+// ========================================
+
+async function salvarProduto(id, card) {
+  const campos = lerCamposProduto(card);
+  if (!campos) return;
+  const { nome, descricao, preco, categoria, ordem } = campos;
 
   const botaoSalvar = card.querySelector('[data-acao="salvar"]');
   botaoSalvar.disabled = true;
@@ -423,27 +431,9 @@ adicionarProdutoBtn.addEventListener('click', () => {
 });
 
 async function criarProduto(card) {
-  const nome = card.querySelector('[data-campo="nome"]').value.trim();
-  const descricao = card.querySelector('[data-campo="descricao"]').value.trim();
-  const precoTexto = card.querySelector('[data-campo="preco"]').value;
-  const categoria = card.querySelector('[data-campo="categoria"]').value;
-  const ordemTexto = card.querySelector('[data-campo="ordem"]').value;
-
-  const preco = precoMascaradoParaNumero(precoTexto);
-  const ordem = parseInt(ordemTexto, 10);
-
-  if (!nome) {
-    mostrarFeedback(card, 'O nome não pode ficar vazio.', 'erro');
-    return;
-  }
-  if (!Number.isFinite(preco) || preco < 0) {
-    mostrarFeedback(card, 'Preço inválido.', 'erro');
-    return;
-  }
-  if (!Number.isFinite(ordem) || ordem < 0) {
-    mostrarFeedback(card, 'Ordem inválida.', 'erro');
-    return;
-  }
+  const campos = lerCamposProduto(card);
+  if (!campos) return;
+  const { nome, descricao, preco, categoria, ordem } = campos;
 
   const botaoCriar = card.querySelector('[data-acao="criar"]');
   botaoCriar.disabled = true;
@@ -495,77 +485,6 @@ novoProdutoContainer.addEventListener('click', (event) => {
   } else if (botao.dataset.acao === 'criar') {
     criarProduto(card);
   }
-});
-
-// ========================================
-// CONFIGURAÇÕES (taxa de serviço — ver supabase/010_taxa_servico_configuravel.sql)
-// ========================================
-//
-// "configuracoes" é uma tabela chave/valor (texto puro) editável só por admin
-// (RLS eh_admin(), mesmo padrão de produtos). O percentual da taxa é lido
-// direto daqui pelas RPCs de pedido/fechamento — mudar aqui já vale pro
-// próximo pedido, sem precisar de deploy. Zerar o percentual desativa a
-// taxa por completo (fechar_parcial/conta_da_mesa passam a cobrar R$ 0,00).
-
-async function carregarConfiguracoes() {
-  configCarregandoEl.style.display = 'block';
-  configErroEl.style.display = 'none';
-  configForm.style.display = 'none';
-
-  try {
-    const { data, error } = await supabase
-      .from('configuracoes')
-      .select('valor')
-      .eq('chave', 'taxa_servico_percentual')
-      .maybeSingle();
-
-    if (error) throw error;
-
-    taxaServicoInputEl.value = data ? data.valor : '10';
-    configCarregandoEl.style.display = 'none';
-    configForm.style.display = 'flex';
-  } catch (erro) {
-    console.error('Erro ao carregar configurações:', erro);
-    configCarregandoEl.style.display = 'none';
-    configErroEl.style.display = 'block';
-  }
-}
-
-configTentarBtn.addEventListener('click', carregarConfiguracoes);
-
-configForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-
-  const percentual = parseFloat(taxaServicoInputEl.value);
-  if (!Number.isFinite(percentual) || percentual < 0 || percentual > 100) {
-    configFeedbackEl.textContent = 'Percentual inválido (deve ser entre 0 e 100).';
-    configFeedbackEl.className = 'admin-produto-card__feedback admin-produto-card__feedback--erro';
-    return;
-  }
-
-  const botaoSalvar = configForm.querySelector('button[type="submit"]');
-  botaoSalvar.disabled = true;
-  botaoSalvar.textContent = 'Salvando...';
-
-  const { error } = await supabase
-    .from('configuracoes')
-    .update({ valor: String(percentual) })
-    .eq('chave', 'taxa_servico_percentual');
-
-  botaoSalvar.disabled = false;
-  botaoSalvar.textContent = 'Salvar';
-
-  if (error) {
-    console.error('Erro ao salvar taxa de serviço:', error);
-    configFeedbackEl.textContent = 'Não foi possível salvar agora. Verifique sua conexão e tente de novo.';
-    configFeedbackEl.className = 'admin-produto-card__feedback admin-produto-card__feedback--erro';
-    return;
-  }
-
-  configFeedbackEl.textContent = percentual === 0
-    ? 'Salvo! Taxa de serviço desativada.'
-    : 'Salvo com sucesso!';
-  configFeedbackEl.className = 'admin-produto-card__feedback admin-produto-card__feedback--sucesso';
 });
 
 // ========================================
