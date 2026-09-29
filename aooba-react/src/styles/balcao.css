@@ -1,0 +1,651 @@
+/* ========================================
+   TELA DO BALCÃO
+   (reaproveita as variáveis e classes de base.css:
+   .header, .nav, .container, .btn, .btn--primary etc.)
+======================================== */
+
+.balcao-header {
+  top: 0; /* aqui não existe a barra de "número da mesa" do cardápio */
+}
+
+/* Bloco de LOGIN (.login-tela, .login-card...) mora em base.css — é
+   reaproveitado por todas as telas que exigem sessão. */
+
+.balcao-header__conexao {
+  font-size: 0.85rem;
+  color: var(--cinza-claro);
+}
+
+.balcao-header__sair {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.85rem;
+}
+
+.balcao-header__tag {
+  color: var(--branco);
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.balcao-header__contador {
+  color: var(--cinza-claro);
+  font-size: 0.9rem;
+}
+
+.balcao-header__contador strong {
+  color: var(--laranja-forte);
+}
+
+.balcao-header__acoes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.balcao-header__historico {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.85rem;
+}
+
+.balcao-header__som {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.85rem;
+}
+
+.balcao-header__som[aria-pressed="true"] {
+  border-color: var(--laranja);
+  color: var(--laranja-forte);
+}
+
+.balcao-header__som-aviso {
+  display: none;
+  color: #ff6b6b;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.balcao-header__som-aviso.show {
+  display: inline-block;
+}
+
+.balcao-main {
+  padding: 7rem 1.25rem 3rem;
+  min-height: 100vh;
+}
+
+.balcao-vazio {
+  text-align: center;
+  color: var(--cinza-claro);
+  font-size: 1.1rem;
+  padding: 4rem 0;
+}
+
+.balcao-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.pedido-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.4rem;
+  background: var(--preto-2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 5px solid var(--laranja);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  animation: pedido-entra 0.4s ease;
+}
+
+@keyframes pedido-entra {
+  from { opacity: 0; transform: translateY(-14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pedido-card__mesa {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  font-size: 2rem;
+  color: var(--laranja-forte);
+}
+
+.pedido-card__cliente {
+  color: var(--salmao);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.pedido-card__horario {
+  color: var(--cinza-claro);
+  font-size: 0.85rem;
+}
+
+.pedido-card__itens {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pedido-card__itens li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.92rem;
+}
+
+.pedido-card__itens li span:first-child {
+  color: var(--branco);
+}
+
+.pedido-card__itens li span:last-child {
+  color: var(--cinza-claro);
+}
+
+.pedido-card__item-fim {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pedido-card__item-remover {
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  background: rgba(255, 107, 107, 0.1);
+  color: #ff6b6b;
+  width: 1.4rem;
+  height: 1.4rem;
+  line-height: 1;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pedido-card__item-remover:hover {
+  background: rgba(255, 107, 107, 0.25);
+}
+
+.pedido-card__total {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  color: var(--laranja);
+  text-align: right;
+}
+
+.pedido-card__entregar {
+  align-self: flex-end;
+  font-size: 0.95rem;
+  padding: 0.6rem 1.6rem;
+}
+
+/* ========================================
+   FECHAMENTO DE CONTA
+   (alerta destacado, diferente dos cards de pedido)
+======================================== */
+.fechamento-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.fechamento-grid:empty {
+  display: none;
+  margin-bottom: 0;
+}
+
+.fechamento-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1.4rem;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  border-left: 5px solid #ff6b6b;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(255, 107, 107, 0.25);
+  animation: pedido-entra 0.4s ease;
+}
+
+.fechamento-card__icon {
+  font-size: 1.8rem;
+}
+
+.fechamento-card__mesa {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  font-size: 1.5rem;
+  color: #ff6b6b;
+  letter-spacing: 0.3px;
+}
+
+.fechamento-card__horario {
+  color: var(--cinza-claro);
+  font-size: 0.85rem;
+}
+
+.fechamento-card__aviso-pendente {
+  color: #ff6b6b;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.fechamento-card__resumo {
+  padding-top: 0.3rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.fechamento-card__linha {
+  display: flex;
+  justify-content: space-between;
+  color: var(--cinza-claro);
+  font-size: 0.85rem;
+  padding: 0.15rem 0;
+}
+
+.fechamento-card__total {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--laranja);
+}
+
+.fechamento-card__fechar {
+  align-self: flex-end;
+  font-size: 0.95rem;
+  padding: 0.6rem 1.6rem;
+}
+
+/* Subtotal por pessoa (item 4), dentro do card de fechamento da mesa inteira */
+.fechamento-card__pessoas {
+  padding-top: 0.3rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.fechamento-card__pessoas-titulo {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--cinza-claro);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 0.2rem;
+}
+
+.fechamento-card__pessoa-status {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-left: 0.4rem;
+}
+
+.fechamento-card__pessoa-status--em_aberto { color: #ff6b6b; }
+.fechamento-card__pessoa-status--aguardando { color: var(--laranja-forte); }
+.fechamento-card__pessoa-status--pago { color: #6bd97a; }
+
+.fechamento-card__pessoa-detalhe {
+  color: var(--cinza-claro);
+  font-size: 0.72rem;
+  margin-bottom: 0.3rem;
+}
+
+.fechamento-card__saldo-servico {
+  color: var(--cinza-claro);
+  font-size: 0.75rem;
+}
+
+/* Linha "Total | Pago | Falta" — sempre visível no card de fechamento da mesa */
+.fechamento-card__saldo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.82rem;
+  color: var(--cinza-claro);
+}
+
+.fechamento-card__saldo strong {
+  color: var(--branco);
+}
+
+.fechamento-card__saldo .falta strong {
+  color: #ff6b6b;
+}
+
+/* ========================================
+   PAGAMENTO PARCIAL PENDENTE ("fechar minha parte")
+   Alerta mais discreto que o de fechar a mesa inteira (laranja em vez de
+   vermelho): é um aviso de pagamento parcial, não trava o consumo da mesa.
+======================================== */
+.pagamento-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.pagamento-grid:empty {
+  display: none;
+  margin-bottom: 0;
+}
+
+.pagamento-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.2rem 1.4rem;
+  background: rgba(245, 119, 46, 0.08);
+  border: 1px solid rgba(245, 119, 46, 0.35);
+  border-left: 5px solid var(--laranja);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  animation: pedido-entra 0.4s ease;
+}
+
+.pagamento-card__titulo {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--laranja-forte);
+}
+
+.pagamento-card__titulo strong {
+  color: var(--branco);
+}
+
+.pagamento-card__horario {
+  color: var(--cinza-claro);
+  font-size: 0.8rem;
+}
+
+.pagamento-card__itens {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--cinza-claro);
+}
+
+.pagamento-card__itens li {
+  display: flex;
+  justify-content: space-between;
+}
+
+.pagamento-card__itens li span:last-child {
+  color: var(--branco);
+}
+
+.pagamento-card__sem-taxa {
+  align-self: flex-start;
+  padding: 0.2rem 0.6rem;
+  border-radius: 50px;
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff6b6b;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.pagamento-card__resumo {
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pagamento-card__linha {
+  display: flex;
+  justify-content: space-between;
+  color: var(--cinza-claro);
+  font-size: 0.85rem;
+  padding: 0.1rem 0;
+}
+
+.pagamento-card__linha--total {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  color: var(--laranja);
+  font-size: 0.95rem;
+}
+
+.pagamento-card__ok {
+  align-self: flex-end;
+  font-size: 0.9rem;
+  padding: 0.55rem 1.4rem;
+}
+
+/* ========================================
+   MESAS ATIVAS
+   (visão geral de toda mesa com sessão aberta — informativo, sem botão de
+   ação, diferente dos alertas de fechamento/pagamento acima)
+======================================== */
+.balcao-secao-titulo {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: var(--laranja-forte);
+  margin: 2rem 0 1rem;
+}
+
+.mesas-ativas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.mesa-ativa-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1.4rem;
+  background: var(--preto-2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 5px solid var(--laranja);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  animation: pedido-entra 0.4s ease;
+}
+
+.mesa-ativa-card__mesa {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  font-size: 2rem;
+  color: var(--laranja-forte);
+}
+
+.mesa-ativa-card__horario {
+  color: var(--cinza-claro);
+  font-size: 0.85rem;
+}
+
+.mesa-ativa-card__vazio {
+  color: var(--cinza-claro);
+  font-size: 0.88rem;
+}
+
+.mesa-ativa-card__fechar {
+  align-self: flex-end;
+  font-size: 0.9rem;
+  padding: 0.55rem 1.4rem;
+}
+
+/* ========================================
+   CONTROLE DE MESAS (liberação pós-fechamento)
+   Card pequeno e denso — uma grade cabe muitas mesas na tela. Bloqueada
+   fica destacada (borda/fundo vermelhos, mesmo tom de fechamento-card)
+   pra chamar atenção do garçom; liberada fica discreta.
+======================================== */
+.controle-mesas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.controle-mesa-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--preto-2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 4px solid rgba(107, 217, 122, 0.6);
+  border-radius: 12px;
+}
+
+.controle-mesa-card--bloqueada {
+  border-left-color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.08);
+}
+
+.controle-mesa-card--inativa {
+  border-left-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.03);
+  opacity: 0.75;
+}
+
+.controle-mesa-card__mesa {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: var(--laranja-forte);
+}
+
+.controle-mesa-card__status {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 0.2rem 0.6rem;
+  border-radius: 50px;
+}
+
+.controle-mesa-card__status--liberada {
+  color: #6bd97a;
+  background: rgba(107, 217, 122, 0.15);
+}
+
+.controle-mesa-card__status--bloqueada {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.15);
+}
+
+.controle-mesa-card__status--inativa {
+  color: var(--cinza-claro);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.controle-mesa-card__sessao {
+  font-size: 0.75rem;
+  color: var(--cinza-claro);
+}
+
+.controle-mesa-card__liberar {
+  align-self: stretch;
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+}
+
+.controle-mesa-card__desativar {
+  align-self: stretch;
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+}
+
+.controle-mesa-card__ativar {
+  align-self: stretch;
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+}
+
+/*MODAL: HISTÓRICO DE PEDIDOS*/
+.modal-panel--historico {
+  width: min(560px, 92vw);
+}
+
+/*MODAL: CONTROLE DE MESAS*/
+.modal-panel--controle-mesas {
+  width: min(700px, 92vw);
+}
+
+.controle-mesas-massa {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.controle-mesas-massa .btn {
+  flex: 1;
+  font-size: 0.85rem;
+  padding: 0.6rem 1rem;
+}
+
+/* Grade rolável dentro do max-height do modal (mesmo esquema de
+   .modal-panel__itens em base.css) — sem isso os cards empurram o modal
+   inteiro pra baixo do topo (max-height sem overflow constrói uma caixa
+   "vazando" em vez de rolar por dentro). */
+.modal-panel--controle-mesas .controle-mesas-grid {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 0.6rem;
+  margin-right: -0.6rem;
+  margin-bottom: 0;
+}
+
+.historico-pedido {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.historico-pedido:last-child {
+  border-bottom: none;
+}
+
+.historico-pedido__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.historico-pedido__mesa {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  color: var(--laranja-forte);
+}
+
+.historico-pedido__horario {
+  color: var(--cinza-claro);
+  font-size: 0.8rem;
+}
+
+.historico-pedido__status {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 50px;
+  align-self: flex-start;
+}
+
+.historico-pedido__status--pendente {
+  color: var(--laranja-forte);
+  background: rgba(245, 119, 46, 0.15);
+}
+
+.historico-pedido__status--entregue {
+  color: #6bd97a;
+  background: rgba(107, 217, 122, 0.15);
+}
+
+.historico-pedido__status--finalizado {
+  color: var(--cinza-claro);
+  background: rgba(255, 255, 255, 0.08);
+}

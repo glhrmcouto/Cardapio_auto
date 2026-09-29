@@ -1,0 +1,304 @@
+/* ========================================
+   RELATÓRIOS — painel de vendas
+   (reaproveita as variáveis e classes de base.css/admin.css:
+   .admin-header, .admin-main, .admin-toolbar, .admin-titulo, .btn,
+   .cardapio-status etc.)
+======================================== */
+
+/* ===== BACKUP COMPLETO (independe do período selecionado) ===== */
+.rel-backup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.rel-backup__dica {
+  font-size: 0.75rem;
+  color: var(--cinza-claro);
+}
+
+/* ===== SELETOR DE PERÍODO ===== */
+.rel-periodo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1rem 1.25rem;
+  background: var(--preto-2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+}
+
+.rel-periodo__atalhos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.rel-periodo__btn {
+  padding: 0.5rem 1rem;
+  border-radius: 50px;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: var(--cinza-claro);
+  font-family: var(--fonte-texto);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color var(--transicao), color var(--transicao), background var(--transicao);
+}
+
+.rel-periodo__btn:hover {
+  border-color: var(--laranja);
+  color: var(--branco);
+}
+
+.rel-periodo__btn--ativo {
+  background: linear-gradient(135deg, var(--laranja-forte), var(--laranja));
+  border-color: transparent;
+  color: var(--preto);
+}
+
+.rel-periodo__custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.rel-periodo__custom label {
+  font-size: 0.8rem;
+  color: var(--cinza-claro);
+}
+
+.rel-periodo__custom input[type="date"] {
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--preto);
+  color: var(--branco);
+  font-family: var(--fonte-texto);
+  font-size: 0.85rem;
+  color-scheme: dark;
+}
+
+.rel-periodo__custom input[type="date"]:focus {
+  outline: none;
+  border-color: var(--laranja);
+}
+
+.rel-periodo__custom input[type="date"]::-webkit-calendar-picker-indicator {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FF7A1A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+.rel-periodo__aplicar {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.85rem;
+}
+
+/* ===== ESTADO VAZIO ===== */
+.rel-vazio {
+  text-align: center;
+  padding: 4rem 1.25rem;
+  color: var(--cinza-claro);
+}
+
+.rel-vazio p {
+  margin-bottom: 0.5rem;
+}
+
+.rel-vazio__dica {
+  font-size: 0.85rem;
+  color: #8a8a8a;
+}
+
+/* ===== CARDS DE RESUMO ===== */
+.rel-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.rel-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.25rem 1.4rem;
+  background: var(--preto-2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.rel-card__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--cinza-claro);
+}
+
+.rel-card__valor {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: clamp(1.4rem, 3vw, 1.8rem);
+  color: var(--laranja-forte);
+}
+
+.rel-card__valor--texto {
+  font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== GRÁFICOS ===== */
+.rel-graficos {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.rel-painel {
+  padding: 1.4rem;
+  background: var(--preto-2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  margin-bottom: 1.25rem;
+}
+
+.rel-graficos .rel-painel {
+  margin-bottom: 0;
+}
+
+.rel-painel__titulo {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--salmao);
+  margin-bottom: 1rem;
+}
+
+.rel-painel__subtitulo {
+  font-family: var(--fonte-texto);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--cinza-claro);
+  margin-left: 0.6rem;
+}
+
+.rel-painel__canvas {
+  position: relative;
+  height: 280px;
+}
+
+.rel-painel--hora .rel-painel__canvas {
+  height: 220px;
+}
+
+/* ===== TABELAS ===== */
+.rel-tabelas {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 1.25rem;
+}
+
+.rel-tabela-bloco {
+  padding: 1.4rem;
+  background: var(--preto-2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.rel-tabela-bloco__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.rel-tabela-bloco__topo .rel-painel__titulo {
+  margin-bottom: 0;
+}
+
+.rel-tabela-scroll {
+  overflow-x: auto;
+}
+
+.rel-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.rel-tabela th {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--cinza-claro);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  white-space: nowrap;
+}
+
+.rel-tabela th[data-ordenar] {
+  cursor: pointer;
+  user-select: none;
+}
+
+.rel-tabela th[data-ordenar]:hover {
+  color: var(--laranja-forte);
+}
+
+.rel-tabela th[data-ordenar]::after {
+  content: '↕';
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 0.7rem;
+  opacity: 0.35;
+}
+
+.rel-tabela th.rel-tabela__th--ativo::after {
+  opacity: 1;
+}
+
+.rel-tabela th.rel-tabela__th--ativo[data-direcao="asc"]::after {
+  content: '▲';
+}
+
+.rel-tabela th.rel-tabela__th--ativo[data-direcao="desc"]::after {
+  content: '▼';
+}
+
+.rel-tabela td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rel-tabela tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.rel-tabela td:nth-child(2),
+.rel-tabela td:nth-child(3) {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .rel-graficos,
+  .rel-tabelas {
+    grid-template-columns: 1fr;
+  }
+}

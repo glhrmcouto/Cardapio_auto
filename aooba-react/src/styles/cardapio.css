@@ -1,0 +1,964 @@
+/* ========================================
+   CARDÁPIO PÚBLICO (index.html)
+   (carregado depois de base.css)
+======================================== */
+
+/*AVISO DE SEM CONEXÃO*/
+/* Fica acima de tudo (inclusive a barra da mesa), some por padrão fora da
+   tela em vez de "display: none" — assim dá pra medir a altura real dele
+   (offlineAviso.offsetHeight, em script.js) mesmo enquanto está escondido,
+   e empurrar a barra da mesa/header pra baixo na medida certa, sem
+   precisar de um número de pixels chutado no CSS. */
+.offline-aviso {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 260;
+  transform: translateY(-100%);
+  transition: transform var(--transicao);
+  padding: 0.55rem 1.25rem;
+  background: #ff6b6b;
+  color: #2b0505;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.offline-aviso.show {
+  transform: translateY(0);
+}
+
+/* Empurra a barra da mesa e o header pra baixo enquanto o aviso está visível */
+body.is-offline .mesa-bar {
+  top: var(--offline-altura, 40px);
+}
+
+body.is-offline .header {
+  top: calc(48px + var(--offline-altura, 40px));
+}
+
+/*BARRA FIXA: NÚMERO DA MESA*/
+.mesa-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.6rem 1.25rem;
+  background: var(--preto-2);
+  border-bottom: 2px solid var(--laranja);
+  transition: top var(--transicao);
+}
+
+.mesa-bar label {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--laranja-forte);
+}
+
+.mesa-bar input {
+  width: 90px;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--preto);
+  color: var(--branco);
+  font-family: var(--fonte-texto);
+  font-size: 1rem;
+  text-align: center;
+}
+
+.mesa-bar input:focus {
+  outline: none;
+  border-color: var(--laranja);
+}
+
+/* Campo travado (mesa veio de ?mesa= na URL, via QR code) — não editável de propósito */
+.mesa-bar input:read-only {
+  background: var(--preto-2);
+  color: var(--cinza-claro);
+  border-color: rgba(255, 255, 255, 0.1);
+  cursor: not-allowed;
+}
+
+.mesa-bar__aviso {
+  display: none;
+  color: #ff6b6b;
+  font-size: 0.8rem;
+  font-weight: 600;
+  width: 100%;
+  text-align: center;
+}
+
+.mesa-bar__aviso.show {
+  display: block;
+}
+
+/* Botão discreto pra ver/trocar o nome informado no modal de identificação */
+.mesa-bar__nome {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  padding: 0.3rem 0.7rem;
+  border-radius: 50px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: var(--cinza-claro);
+  font-family: var(--fonte-texto);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color var(--transicao), color var(--transicao);
+}
+
+.mesa-bar__nome:hover {
+  border-color: var(--laranja);
+  color: var(--laranja-forte);
+}
+
+.nav__links {
+  display: none;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.nav__links a {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--branco);
+  transition: color var(--transicao);
+  position: relative;
+}
+
+.nav__links a:hover {
+  color: var(--laranja);
+}
+
+@media (min-width: 768px) {
+  .nav__links {
+    display: flex;
+  }
+}
+
+/*HERO*/
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+}
+
+.hero__bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(245, 119, 46, 0.25), transparent 60%),
+    radial-gradient(ellipse at 20% 80%, rgba(247, 155, 107, 0.12), transparent 50%),
+    var(--preto);
+  z-index: -1;
+}
+
+.hero__content {
+  padding-top: 4rem;
+}
+
+.hero__logo {
+  display: block;
+  width: min(90vw, 620px);
+  margin: 0 auto;
+  filter: drop-shadow(0 0 45px rgba(255, 122, 26, 0.55));
+}
+
+.hero__subtitle {
+  color: var(--cinza-claro);
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  max-width: 500px;
+  margin: 1.5rem auto 2.2rem;
+}
+
+.hero__scroll {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26px;
+  height: 42px;
+  border: 2px solid var(--laranja);
+  border-radius: 20px;
+}
+
+.hero__scroll span {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  background: var(--laranja);
+  border-radius: 50%;
+  animation: scroll-bounce 1.6s infinite;
+}
+
+@keyframes scroll-bounce {
+  0% { top: 6px; opacity: 1; }
+  70% { top: 22px; opacity: 0; }
+  100% { top: 22px; opacity: 0; }
+}
+
+/*SOBRE*/
+.sobre {
+  padding: 5rem 1.25rem;
+  text-align: center;
+}
+
+.sobre__text {
+  max-width: 700px;
+  margin: 0 auto;
+  color: var(--cinza-claro);
+  font-size: 1.05rem;
+  line-height: 1.8;
+}
+
+/*CARDS (drinks, cervejas, narguile)*/
+.bebidas,
+.narguile,
+.semAlcool {
+  padding: 4rem 1.25rem;
+}
+
+.narguile__intro {
+  max-width: 700px;
+  margin: 0 auto 2.5rem;
+  text-align: center;
+  color: var(--cinza-claro);
+  line-height: 1.7;
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1.5rem;
+}
+
+.card {
+  background: var(--preto-2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  transition: transform var(--transicao), border-color var(--transicao), box-shadow var(--transicao);
+}
+
+/* .card__img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+} */
+
+
+.card:hover {
+  transform: translateY(-6px);
+  border-color: var(--laranja);
+  box-shadow: 0 0 25px rgba(245, 119, 46, 0.35);
+}
+
+.card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.card__name {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--branco);
+}
+
+.card__price {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  color: var(--laranja);
+  white-space: nowrap;
+}
+
+.card__desc {
+  color: var(--cinza-claro);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+/* Botão "Adicionar" usado nos cards de drinks, cervejas, narguile e essências */
+/* Checkbox "dividir entre a mesa", só nos cards de narguilé */
+.card__compartilhado {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.7rem 0;
+  font-size: 0.85rem;
+  color: var(--cinza-claro);
+  cursor: pointer;
+}
+
+.card__compartilhado-check {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--laranja);
+  cursor: pointer;
+}
+
+.btn--add {
+  display: block;
+  width: 100%;
+  margin-top: 1.1rem;
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  background: transparent;
+  border: 1.5px solid var(--laranja);
+  color: var(--laranja-forte);
+  box-shadow: none;
+  text-align: center;
+}
+
+.btn--add:hover {
+  background: var(--laranja);
+  color: var(--preto);
+  transform: translateY(-2px);
+}
+
+/*DIVISOR*/
+.divisor {
+  position: relative;
+  padding: 6rem 1.25rem;
+  text-align: center;
+  background: var(--preto-2);
+  overflow: hidden;
+}
+
+.divisor::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(245, 119, 46, 0.18), transparent 65%);
+}
+
+.divisor__logo {
+  position: relative;
+  display: block;
+  width: min(70vw, 380px);
+  margin: 0 auto;
+  filter: drop-shadow(0 0 40px rgba(255, 122, 26, 0.6));
+}
+
+/*ESSÊNCIAS*/
+.essencias {
+  padding: 4rem 1.25rem 5rem;
+}
+
+.essencias-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.25rem;
+}
+
+.essencia-card {
+  background: var(--preto-2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 1.3rem;
+  text-align: center;
+  transition: transform var(--transicao), border-color var(--transicao), box-shadow var(--transicao);
+}
+
+.essencia-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--salmao);
+  box-shadow: 0 0 20px rgba(247, 155, 107, 0.3);
+}
+
+.essencia-card__name {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--branco);
+  margin-bottom: 0.5rem;
+}
+
+.essencia-card__tag {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--preto);
+  background: var(--salmao);
+  padding: 0.25rem 0.7rem;
+  border-radius: 50px;
+}
+
+.essencia-card__add {
+  margin-top: 0.9rem;
+}
+
+/*RODAPÉ*/
+.footer {
+  background: #000;
+  border-top: 1px solid rgba(245, 119, 46, 0.2);
+  padding: 3.5rem 1.25rem 2rem;
+  text-align: center;
+}
+
+.footer__logo {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  font-size: 2rem;
+  color: var(--laranja-forte);
+  margin-bottom: 1.2rem;
+}
+
+.footer__logo span {
+  color: var(--branco);
+}
+
+.footer__info p {
+  color: var(--cinza-claro);
+  font-size: 0.92rem;
+  margin-bottom: 0.4rem;
+}
+
+.footer__socials {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.social-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--branco);
+  transition: color var(--transicao), border-color var(--transicao), transform var(--transicao);
+}
+
+.social-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.social-icon:hover {
+  color: var(--laranja);
+  border-color: var(--laranja);
+  transform: translateY(-3px);
+}
+
+.footer__copy {
+  color: #6b6b6b;
+  font-size: 0.8rem;
+  margin-top: 1rem;
+}
+
+/*ANIMAÇÃO FADE-IN (ativada via JS)*/
+.fade-in {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.fade-in.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/*CARRINHO DE PEDIDOS*/
+.cart-fab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 300;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--laranja-forte), var(--laranja));
+  color: var(--preto);
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px rgba(255, 122, 26, 0.5);
+  transition: transform var(--transicao);
+}
+
+.cart-fab:hover {
+  transform: scale(1.06);
+}
+
+.cart-fab__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border-radius: 50%;
+  background: var(--branco);
+  color: var(--preto);
+  font-family: var(--fonte-texto);
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cart-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 350;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transicao);
+}
+
+.cart-overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.cart-panel {
+  position: fixed;
+  top: 0;
+  right: -100%;
+  width: min(380px, 100%);
+  height: 100%;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1.25rem;
+  background: var(--preto-2);
+  border-left: 1px solid rgba(245, 119, 46, 0.25);
+  transition: right var(--transicao);
+}
+
+.cart-panel.is-open {
+  right: 0;
+}
+
+.cart-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.cart-panel__title {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  font-size: 1.3rem;
+  color: var(--laranja-forte);
+}
+
+.cart-panel__close {
+  background: none;
+  border: none;
+  color: var(--branco);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cart-panel__empty {
+  color: var(--cinza-claro);
+  text-align: center;
+  padding: 2.5rem 0;
+}
+
+.cart-panel__items {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.cart-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cart-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.cart-item__nome {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.cart-item__preco {
+  font-size: 0.85rem;
+  color: var(--laranja);
+}
+
+/* Marca um item do carrinho como "dividir entre a mesa" */
+.cart-item__tag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 50px;
+  background: rgba(245, 119, 46, 0.2);
+  color: var(--laranja-forte);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.cart-item__controles {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.cart-item__btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--laranja);
+  background: transparent;
+  color: var(--laranja-forte);
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cart-item__btn:hover {
+  background: var(--laranja);
+  color: var(--preto);
+}
+
+.cart-item__qtd {
+  min-width: 18px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.cart-item__remover {
+  background: none;
+  border: none;
+  color: #ff6b6b;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-left: 0.3rem;
+}
+
+.cart-panel__footer {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cart-panel__total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 0.9rem;
+}
+
+.cart-panel__total span:last-child {
+  color: var(--laranja);
+}
+
+.cart-panel__submit {
+  width: 100%;
+  text-align: center;
+  font-size: 1rem;
+}
+
+/*FECHAR CONTA (botão fixo)*/
+.fechar-conta-fab {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 1.5rem;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.4rem;
+  border-radius: 50px;
+  border: 1.5px solid var(--laranja);
+  background: var(--preto-2);
+  color: var(--laranja-forte);
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  transition: transform var(--transicao), background var(--transicao), color var(--transicao);
+}
+
+.fechar-conta-fab:hover {
+  background: var(--laranja);
+  color: var(--preto);
+  transform: translateY(-3px);
+}
+
+/*CONFIRMAÇÃO CENTRAL DE PEDIDO ENVIADO (overlay no meio da tela, diferente
+do .toast de rodapé — ver js/script.js, mostrarPedidoConfirmado)*/
+.pedido-confirmado-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 550;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transicao);
+}
+
+.pedido-confirmado-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pedido-confirmado-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: min(320px, 85vw);
+  padding: 2rem 1.5rem;
+  background: var(--preto-2);
+  border: 1px solid var(--laranja);
+  border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  transform: scale(0.9);
+  transition: transform var(--transicao);
+}
+
+.pedido-confirmado-overlay.show .pedido-confirmado-card {
+  transform: scale(1);
+}
+
+.pedido-confirmado-icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--laranja);
+  color: var(--preto);
+  font-size: 1.8rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.pedido-confirmado-texto {
+  color: var(--branco);
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+/*MODAL: CONTA DA MESA (seções "Minha parte" e "Conta da mesa")*/
+.modal-panel--conta {
+  width: min(460px, 92vw);
+}
+
+/* O conteúdo (Minha parte + Conta da mesa) é o único trecho que rola dentro
+   do modal — header e botões (Cancelar/Fechar a conta toda) ficam sempre
+   visíveis. min-height:0 é necessário pro item flex conseguir encolher e
+   rolar (senão ele cresce pra caber o conteúdo inteiro, e o modal transborda
+   pra fora da tela — era exatamente esse o bug). */
+.conta-conteudo {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.6rem;
+  margin-right: -0.6rem;
+  scrollbar-gutter: stable;
+}
+
+/* Dentro do conteúdo rolável, as listas de itens (.modal-panel__itens é
+   reaproveitada aqui) não devem mais rolar por conta própria — só existe UMA
+   área de rolagem agora, que é o .conta-conteudo acima. */
+.modal-panel--conta .modal-panel__itens {
+  flex: none;
+  overflow-y: visible;
+  padding-right: 0;
+  margin-right: 0;
+}
+
+.conta-secao {
+  margin-bottom: 1.3rem;
+  padding-bottom: 1.3rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.conta-secao:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0.3rem;
+  padding-bottom: 0;
+}
+
+.conta-secao__titulo {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--salmao);
+  margin-bottom: 0.7rem;
+}
+
+.conta-minha-vazio,
+.conta-mesa-vazio {
+  color: var(--cinza-claro);
+  font-size: 0.88rem;
+  padding: 0.5rem 0;
+}
+
+/* Marca o item já vinculado a um pagamento (pago ou aguardando confirmação) */
+.conta-item--pago {
+  opacity: 0.55;
+}
+
+.conta-item__tag-pago {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6bd97a;
+}
+
+.conta-minha-acao {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.conta-minha-taxa-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--cinza-claro);
+  cursor: pointer;
+  margin-bottom: 0.3rem;
+}
+
+.conta-minha-taxa-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--laranja);
+  cursor: pointer;
+}
+
+.conta-minha-linha-total {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  padding-top: 0.4rem;
+  margin-top: 0.2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.conta-minha-linha-total strong {
+  color: var(--laranja);
+}
+
+.conta-minha-total {
+  border-top: none;
+  padding-top: 0;
+  margin-bottom: 0.8rem;
+  font-size: 1rem;
+}
+
+.conta-minha-fechar {
+  width: 100%;
+  font-size: 0.95rem;
+  padding: 0.75rem 1rem;
+}
+
+.conta-minha-aviso {
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  background: rgba(245, 119, 46, 0.1);
+  border: 1px solid rgba(245, 119, 46, 0.3);
+  color: var(--cinza-claro);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.conta-minha-aviso strong {
+  color: var(--laranja);
+}
+
+.conta-minha-aviso--pago {
+  background: rgba(107, 217, 122, 0.1);
+  border-color: rgba(107, 217, 122, 0.3);
+}
+
+.conta-minha-aviso--pago strong {
+  color: #6bd97a;
+}
+
+.conta-pessoas {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+}
+
+.conta-pessoas li {
+  font-size: 0.88rem;
+}
+
+.conta-pessoas__linha-principal {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.conta-pessoas__detalhe {
+  color: var(--cinza-claro);
+  font-size: 0.76rem;
+  margin-top: 0.1rem;
+}
+
+.conta-pessoas__status {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-left: 0.4rem;
+}
+
+.conta-pessoas__status--em_aberto { color: #ff6b6b; }
+.conta-pessoas__status--aguardando { color: var(--laranja-forte); }
+.conta-pessoas__status--pago { color: #6bd97a; }

@@ -1,0 +1,122 @@
+/* ========================================
+   GERAR QR CODES
+   (reaproveita .header/.admin-header/.admin-main/.admin-toolbar/.admin-titulo
+   de admin.css, .btn/.cardapio-status/.login-tela/.login-card de base.css)
+======================================== */
+
+.qr-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.qr-instrucoes {
+  max-width: 640px;
+  color: var(--cinza-claro);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.qr-instrucoes a {
+  color: var(--laranja-forte);
+  text-decoration: underline;
+}
+
+.qr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Cartão pensado pra ser recortado e colado na mesa — por isso é branco
+   (economiza tinta, fica legível impresso) mesmo com o resto do site escuro,
+   e o que você vê aqui na tela é exatamente o que vai sair na impressão. */
+.qr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1.75rem 1.5rem 2rem;
+  background: #ffffff;
+  border: 2px dashed #d0d0d0;
+  border-radius: 24px;
+  text-align: center;
+  break-inside: avoid;
+}
+
+.qr-card__marca {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: 0.5px;
+  color: var(--laranja-forte);
+}
+
+.qr-card__mesa-label {
+  margin-top: 0.6rem;
+  font-family: var(--fonte-texto);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #8a8a8a;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.qr-card__mesa-numero {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  font-size: 2.6rem;
+  line-height: 1;
+  color: #1a1a1a;
+  margin-bottom: 0.5rem;
+}
+
+.qr-card__canvas {
+  display: block;
+  margin: 0.2rem 0 0.6rem;
+}
+
+.qr-card__instrucao {
+  font-family: var(--fonte-texto);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #8a8a8a;
+  max-width: 200px;
+}
+
+.qr-card__falha {
+  color: #d03b3b;
+  font-size: 0.85rem;
+}
+
+/* ===== IMPRESSÃO: só os QR codes, sem chrome do site ===== */
+@media print {
+  .header,
+  .admin-toolbar,
+  .qr-instrucoes,
+  .cardapio-status {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .admin-main {
+    padding: 0.5rem;
+    min-height: 0;
+  }
+
+  .qr-grid {
+    gap: 0.75rem;
+  }
+
+  .qr-card {
+    border-color: #999;
+  }
+
+  .qr-card__mesa-numero {
+    color: #000;
+  }
+}

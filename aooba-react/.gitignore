@@ -1,0 +1,5 @@
+json/settings.local.json
+node_modules/
+node_modules
+dist
+.env
