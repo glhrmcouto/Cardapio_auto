@@ -468,7 +468,7 @@ async function baixarBackupCompleto() {
 backupBtn.addEventListener('click', baixarBackupCompleto);
 
 // ========================================
-// GRÁFICOS (Chart.js, cores da marca — ver style.css)
+// GRÁFICOS (Chart.js, cores da marca — ver base.css)
 // ========================================
 
 const COR_TEXTO_SECUNDARIO = '#c9c9c9';

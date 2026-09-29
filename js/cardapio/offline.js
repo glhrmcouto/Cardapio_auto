@@ -16,7 +16,7 @@ function atualizarAvisoOffline() {
 }
 
 // Mede a altura real do aviso (ele nunca sai do fluxo com display:none, só
-// desliza pra fora da tela — ver .offline-aviso em style.css), pra barra da
+// desliza pra fora da tela — ver .offline-aviso em cardapio.css), pra barra da
 // mesa/header descerem exatamente o espaço certo, mesmo se o texto quebrar
 // em duas linhas numa tela estreita.
 function medirAlturaOffline() {

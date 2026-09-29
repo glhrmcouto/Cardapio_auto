@@ -135,7 +135,7 @@ document.addEventListener('click', (event) => {
 //
 // Diferente do toast de rodapé (mostrarToast, em shared.js): "Pedido enviado" pedia
 // destaque forte, então sobe centralizada, com fundo escurecido atrás — ver
-// .pedido-confirmado-overlay em css/style.css. Some sozinha depois de
+// .pedido-confirmado-overlay em css/cardapio.css. Some sozinha depois de
 // alguns segundos ou ao toque em qualquer lugar do overlay.
 
 const pedidoConfirmadoOverlay = document.getElementById('pedidoConfirmadoOverlay');

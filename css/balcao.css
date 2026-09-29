@@ -1,6 +1,6 @@
 /* ========================================
    TELA DO BALCÃO
-   (reaproveita as variáveis e classes de style.css:
+   (reaproveita as variáveis e classes de base.css:
    .header, .nav, .container, .btn, .btn--primary etc.)
 ======================================== */
 
@@ -8,8 +8,8 @@
   top: 0; /* aqui não existe a barra de "número da mesa" do cardápio */
 }
 
-/* Bloco de LOGIN (.login-tela, .login-card...) mora em style.css agora —
-   é reaproveitado por balcao.html e admin.html, os dois exigem sessão. */
+/* Bloco de LOGIN (.login-tela, .login-card...) mora em base.css — é
+   reaproveitado por todas as telas que exigem sessão. */
 
 .balcao-header__conexao {
   font-size: 0.85rem;
@@ -584,7 +584,7 @@
 }
 
 /* Grade rolável dentro do max-height do modal (mesmo esquema de
-   .modal-panel__itens em style.css) — sem isso os cards empurram o modal
+   .modal-panel__itens em base.css) — sem isso os cards empurram o modal
    inteiro pra baixo do topo (max-height sem overflow constrói uma caixa
    "vazando" em vez de rolar por dentro). */
 .modal-panel--controle-mesas .controle-mesas-grid {

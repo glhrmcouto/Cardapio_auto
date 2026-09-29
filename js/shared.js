@@ -47,7 +47,7 @@ export function formatarDataISO(data) {
   return `${ano}-${mes}-${dia}`;
 }
 
-// Aviso discreto no rodapé da tela (#toast, estilo .toast em css/style.css).
+// Aviso discreto no rodapé da tela (#toast, estilo .toast em css/base.css).
 // O elemento é buscado na hora da chamada porque nem toda página que importa
 // este arquivo tem um #toast.
 let toastTimer;
