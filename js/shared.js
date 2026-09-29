@@ -54,3 +54,11 @@ export function mostrarToast(mensagem) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toastEl.classList.remove('show'), 3500);
 }
+
+// URL exata que vira QR code de uma mesa, montada a partir do próprio domínio
+// em que a página está rodando — assim funciona igual em localhost, no
+// preview do Netlify e no domínio final, sem precisar fixar nada aqui. Usada
+// pelo admin (link de cada mesa) e pelo gerador de QR codes.
+export function montarUrlMesa(mesa) {
+  return `${window.location.origin}/index.html?mesa=${mesa.numero}&t=${mesa.token}`;
+}

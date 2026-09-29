@@ -9,6 +9,7 @@
 
 import { supabase } from './supabaseClient.js';
 import { configurarLogin } from './auth.js';
+import { montarUrlMesa } from './shared.js';
 
 
 const qrCarregandoEl = document.getElementById('qrCarregando');
@@ -23,13 +24,6 @@ const qrRecarregarBtn = document.getElementById('qrRecarregarBtn');
 // ========================================
 // MESAS -> QR CODES
 // ========================================
-
-// Mesma lógica do admin.html: monta a URL a partir do domínio onde esta
-// própria página está rodando (localhost, preview do Netlify, produção...),
-// sem precisar fixar domínio nenhum aqui.
-function montarUrlMesa(mesa) {
-  return `${window.location.origin}/index.html?mesa=${mesa.numero}&t=${mesa.token}`;
-}
 
 async function gerarQrCodes(mesas) {
   qrGrid.innerHTML = '';
