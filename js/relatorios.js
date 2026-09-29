@@ -10,17 +10,9 @@
 // mostrar a tela vazia por um instante pra quem não pode ver nada.
 
 import { supabase } from './supabaseClient.js';
+import { configurarLogin } from './auth.js';
 import { formatarPreco, escaparTexto, formatarDataISO } from './shared.js';
 
-const loginTela = document.getElementById('loginTela');
-const loginForm = document.getElementById('loginForm');
-const loginEmailEl = document.getElementById('loginEmail');
-const loginSenhaEl = document.getElementById('loginSenha');
-const loginErroEl = document.getElementById('loginErro');
-const loginEntrarBtn = document.getElementById('loginEntrarBtn');
-
-const relatoriosPagina = document.getElementById('relatoriosPagina');
-const sairBtn = document.getElementById('sairBtn');
 
 const relatorioCarregandoEl = document.getElementById('relatorioCarregando');
 const relatorioErroEl = document.getElementById('relatorioErro');
@@ -63,92 +55,6 @@ const CORES_CATEGORIA = {
   narguile: '#c98500',
   essencia: '#d55181',
 };
-
-// ========================================
-// LOGIN / LOGOUT (com checagem de papel admin)
-// ========================================
-
-function mostrarTelaLogin(mensagemErro) {
-  relatoriosPagina.style.display = 'none';
-  loginTela.style.display = 'flex';
-  loginEmailEl.value = '';
-  loginSenhaEl.value = '';
-
-  if (mensagemErro) {
-    loginErroEl.textContent = mensagemErro;
-    loginErroEl.style.display = 'block';
-  } else {
-    loginErroEl.style.display = 'none';
-  }
-}
-
-let paginaIniciada = false;
-
-function mostrarPagina() {
-  loginTela.style.display = 'none';
-  relatoriosPagina.style.display = '';
-
-  if (paginaIniciada) return;
-  paginaIniciada = true;
-
-  ativarAtalho('7dias');
-}
-
-async function verificarAdminEExibir(session) {
-  if (!session) {
-    mostrarTelaLogin();
-    return;
-  }
-
-  const { data: perfil, error } = await supabase
-    .from('perfis')
-    .select('papel')
-    .eq('user_id', session.user.id)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Erro ao verificar permissão de admin:', error);
-    mostrarTelaLogin('Não foi possível verificar sua permissão agora. Tente de novo.');
-    await supabase.auth.signOut();
-    return;
-  }
-
-  if (!perfil || perfil.papel !== 'admin') {
-    mostrarTelaLogin('Este usuário não tem permissão de administrador.');
-    await supabase.auth.signOut();
-    return;
-  }
-
-  mostrarPagina();
-}
-
-loginForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-
-  loginEntrarBtn.disabled = true;
-  loginEntrarBtn.textContent = 'Entrando...';
-  loginErroEl.style.display = 'none';
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: loginEmailEl.value.trim(),
-    password: loginSenhaEl.value,
-  });
-
-  loginEntrarBtn.disabled = false;
-  loginEntrarBtn.textContent = 'Entrar';
-
-  if (error) {
-    loginErroEl.textContent = 'E-mail ou senha inválidos.';
-    loginErroEl.style.display = 'block';
-    return;
-  }
-
-  await verificarAdminEExibir(data.session);
-});
-
-sairBtn.addEventListener('click', () => {
-  supabase.auth.signOut();
-});
 
 // ========================================
 // SELETOR DE PERÍODO
@@ -659,9 +565,9 @@ function renderizarGraficoHora(porHora) {
 // BOOTSTRAP (fica por último de propósito)
 // ========================================
 //
-// verificarAdminEExibir(), disparada pela checagem inicial de sessão logo
-// abaixo, chama mostrarPagina() -> ativarAtalho() de forma síncrona (sem
-// nenhum "await" no meio). Se esse bootstrap ficasse ANTES das
+// configurarLogin() (auth.js), pela checagem inicial de sessão, chama
+// aoEntrar -> ativarAtalho() de forma síncrona (sem nenhum "await" no
+// meio). Se esse bootstrap ficasse ANTES das
 // declarações de estado (ex.: "let periodoAtual" lá em cima), a chamada
 // síncrona chegaria em "periodoAtual = ..." antes da própria declaração
 // ter rodado — o "await" no topo do módulo só suspende a CONTINUAÇÃO do
@@ -669,12 +575,8 @@ function renderizarGraficoHora(porHora) {
 // seguintes) só existe de fato depois que essa promise resolve. Por isso
 // esse bloco só roda depois que toda declaração do arquivo já aconteceu.
 
-supabase.auth.onAuthStateChange((_evento, session) => {
-  if (!session) {
-    paginaIniciada = false;
-    mostrarTelaLogin();
-  }
+await configurarLogin({
+  conteudoEl: document.getElementById('relatoriosPagina'),
+  exigirAdmin: true,
+  aoEntrar: () => ativarAtalho('7dias'),
 });
-
-const { data: { session: sessaoInicial } } = await supabase.auth.getSession();
-await verificarAdminEExibir(sessaoInicial);
