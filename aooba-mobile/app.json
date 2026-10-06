@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "AOOBA! BAR",
+    "slug": "aooba-mobile",
+    "scheme": "aooba",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0d0d0d",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "br.com.aooba.cardapio"
+    },
+    "android": {
+      "package": "br.com.aooba.cardapio",
+      "adaptiveIcon": {
+        "backgroundColor": "#0d0d0d",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "O AOOBA! BAR usa a câmera para ler o QR code da sua mesa."
+        }
+      ]
+    ]
+  }
+}
