@@ -20,6 +20,8 @@ function apiFalsa(sobrescrever: Partial<CardapioApi> = {}): jest.Mocked<Cardapio
     statusMesa: jest.fn().mockResolvedValue('liberada'),
     sessaoAtual: jest.fn().mockResolvedValue(null),
     abrirSessao: jest.fn().mockResolvedValue(SESSAO),
+    solicitarEntrada: jest.fn().mockResolvedValue('pendente'),
+    statusSolicitacao: jest.fn().mockResolvedValue(null),
     criarPedido: jest.fn().mockResolvedValue({ id: 'p', mesa: 5, total: 20, status: 'pendente' }),
     conta: jest.fn().mockResolvedValue(contaFalsa),
     fecharMinhaParte: jest.fn().mockResolvedValue({ valor_total: 110 }),
@@ -164,6 +166,108 @@ describe('SessaoViewModel — na dúvida, trava', () => {
     expect(sessao.getState().tela).toBe('sem_conexao');
     await sessao.iniciar('scan');
     expect(sessao.getState().tela).toBe('boas_vindas');
+  });
+});
+
+describe('SessaoViewModel — fila de aprovação do garçom', () => {
+  const bloqueada = () => apiFalsa({ statusMesa: jest.fn().mockResolvedValue('bloqueada') });
+  /** `retomarSolicitacao` roda solta (sem await) depois de `iniciar`; deixa as promessas dela terminarem. */
+  const esvaziarFila = () => new Promise<void>((resolver) => setImmediate(() => resolver()));
+
+  it('pede liberação com o nome: o garçom confirma "João está na mesa" e a tela fica pendente', async () => {
+    const { api, sessao, armazenamento } = montar(bloqueada());
+    await sessao.iniciar('scan');
+    await sessao.pedirLiberacao('  João ');
+    expect(api.solicitarEntrada).toHaveBeenCalledWith(acesso, { clienteId: 'cliente-1', nome: 'João' });
+    expect(sessao.getState()).toMatchObject({ tela: 'mesa_bloqueada', solicitacao: 'pendente', nomeSolicitado: 'João', enviandoSolicitacao: false });
+    expect(await armazenamento.lerNome()).toBe('João'); // o cardápio não pergunta de novo
+    sessao.dispose();
+  });
+
+  it('nome vazio ou grande demais não chama a API e avisa', async () => {
+    const { api, sessao } = montar(bloqueada());
+    await sessao.iniciar('scan');
+    await sessao.pedirLiberacao('   ');
+    await sessao.pedirLiberacao('x'.repeat(21));
+    expect(api.solicitarEntrada).not.toHaveBeenCalled();
+    expect(sessao.getState().aviso?.texto).toContain('Informe seu nome');
+    sessao.dispose();
+  });
+
+  it('erro ao pedir só avisa e deixa tentar de novo', async () => {
+    const api = bloqueada();
+    api.solicitarEntrada.mockRejectedValue(erroApi('SEM_CONEXAO', 0));
+    const { sessao } = montar(api);
+    await sessao.iniciar('scan');
+    await sessao.pedirLiberacao('João');
+    expect(sessao.getState()).toMatchObject({ solicitacao: null, enviandoSolicitacao: false });
+    expect(sessao.getState().aviso?.texto).toContain('erro SEM_CONEXAO');
+    sessao.dispose();
+  });
+
+  it('garçom aprova: a mesa libera e o polling leva às boas-vindas (sessão só com toque)', async () => {
+    jest.useFakeTimers();
+    const api = bloqueada();
+    const { sessao } = montar(api);
+    await sessao.iniciar('scan');
+    await sessao.pedirLiberacao('João');
+
+    api.statusMesa.mockResolvedValue('liberada');
+    await jest.advanceTimersByTimeAsync(INTERVALO_POLL_BLOQUEADA_MS);
+    expect(sessao.getState().tela).toBe('boas_vindas');
+    expect(api.abrirSessao).not.toHaveBeenCalled();
+    sessao.dispose();
+  });
+
+  it('garçom recusa: o polling mostra "recusada" e a pessoa pode pedir de novo', async () => {
+    jest.useFakeTimers();
+    const api = bloqueada();
+    const { sessao } = montar(api);
+    await sessao.iniciar('scan');
+    await sessao.pedirLiberacao('João');
+
+    api.statusSolicitacao.mockResolvedValue('recusada');
+    await jest.advanceTimersByTimeAsync(INTERVALO_POLL_BLOQUEADA_MS);
+    expect(sessao.getState()).toMatchObject({ tela: 'mesa_bloqueada', solicitacao: 'recusada' });
+
+    api.statusSolicitacao.mockResolvedValue('pendente');
+    await sessao.pedirLiberacao('João');
+    expect(api.solicitarEntrada).toHaveBeenCalledTimes(2);
+    expect(sessao.getState().solicitacao).toBe('pendente');
+    sessao.dispose();
+  });
+
+  it('se a mesa já estava liberada ao pedir, segue sem fila', async () => {
+    const api = bloqueada();
+    api.solicitarEntrada.mockResolvedValue('aprovada');
+    const { sessao } = montar(api);
+    await sessao.iniciar('scan');
+    api.statusMesa.mockResolvedValue('liberada');
+    await sessao.pedirLiberacao('João');
+    expect(sessao.getState().tela).toBe('boas_vindas');
+    sessao.dispose();
+  });
+
+  it('reabrir a tela retoma um pedido que já está na fila (sem pedir de novo)', async () => {
+    const api = bloqueada();
+    api.statusSolicitacao.mockResolvedValue('pendente');
+    const { sessao, armazenamento } = montar(api);
+    await armazenamento.gravarNome('João');
+    await sessao.iniciar('retomada');
+    await esvaziarFila();
+    expect(sessao.getState()).toMatchObject({ tela: 'mesa_bloqueada', solicitacao: 'pendente', nomeSolicitado: 'João' });
+    expect(api.solicitarEntrada).not.toHaveBeenCalled();
+    sessao.dispose();
+  });
+
+  it('erro de rede ao retomar não derruba a tela de mesa bloqueada', async () => {
+    const api = bloqueada();
+    api.statusSolicitacao.mockRejectedValue(erroApi('SEM_CONEXAO', 0));
+    const { sessao } = montar(api);
+    await sessao.iniciar('retomada');
+    await esvaziarFila();
+    expect(sessao.getState()).toMatchObject({ tela: 'mesa_bloqueada', solicitacao: null });
+    sessao.dispose();
   });
 });
 

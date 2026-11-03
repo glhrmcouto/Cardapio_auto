@@ -19,6 +19,8 @@ const credencial = z.object({ mesa, token });
 const schemas = {
   mesaQuery: z.object({ t: token }),
   abrirSessao: z.object({ t: token }),
+  solicitarEntrada: z.object({ t: token, clienteId: uuid, nome: z.string().trim().min(1).max(20) }),
+  statusSolicitacao: z.object({ t: token, clienteId: uuid }),
   pedido: z.object({
     mesa,
     token,
@@ -81,6 +83,25 @@ export function criarApp(repo: ClienteRepository, opcoes: { corsOrigins?: string
       const body = schemas.abrirSessao.parse(req.body);
       const c = credencial.parse({ mesa: req.params.mesa, token: body.t });
       res.status(201).json({ sessao: await repo.abrirSessao(c) });
+    }),
+  );
+
+  // ---- fila de aprovação: o garçom confirma que "o João" está na mesa ----
+  app.post(
+    '/api/mesas/:mesa/solicitacao',
+    assincrono(async (req, res) => {
+      const body = schemas.solicitarEntrada.parse(req.body);
+      const c = credencial.parse({ mesa: req.params.mesa, token: body.t });
+      res.status(201).json(await repo.solicitarEntrada({ ...c, clienteId: body.clienteId, nome: body.nome }));
+    }),
+  );
+
+  app.get(
+    '/api/mesas/:mesa/solicitacao',
+    assincrono(async (req, res) => {
+      const q = schemas.statusSolicitacao.parse(req.query);
+      const c = credencial.parse({ mesa: req.params.mesa, token: q.t });
+      res.json({ status: await repo.statusSolicitacao({ ...c, clienteId: q.clienteId }) });
     }),
   );
 

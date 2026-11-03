@@ -126,3 +126,10 @@ export interface SessaoAtual {
   sessao_id: string;
   token_sessao: string;
 }
+
+export interface SolicitacaoEntrada {
+  id: string;
+  mesa: number;
+  nome: string;
+  criado_em: string;
+}

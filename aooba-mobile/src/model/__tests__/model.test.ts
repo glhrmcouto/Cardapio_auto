@@ -190,6 +190,22 @@ describe('AooobaApi', () => {
     expect(f.mock.calls[0][0]).toBe('http://srv/api/mesas/3/status?t=a%20b%26c');
   });
 
+  it('solicitarEntrada envia nome e clienteId no corpo e devolve o status', async () => {
+    const f = jest.fn().mockReturnValue(resposta(201, { id: 'sol', status: 'pendente' }));
+    const status = await new AooobaApi('http://srv', f as unknown as typeof fetch).solicitarEntrada({ mesa: 5, token: 'tk' }, { clienteId: 'cid', nome: 'João' });
+    expect(status).toBe('pendente');
+    const [url, init] = f.mock.calls[0];
+    expect(url).toBe('http://srv/api/mesas/5/solicitacao');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ t: 'tk', clienteId: 'cid', nome: 'João' });
+  });
+
+  it('statusSolicitacao codifica token e clienteId na query e aceita null', async () => {
+    const f = jest.fn().mockReturnValue(resposta(200, { status: null }));
+    expect(await new AooobaApi('http://srv', f as unknown as typeof fetch).statusSolicitacao({ mesa: 5, token: 'a b' }, 'c&d')).toBeNull();
+    expect(f.mock.calls[0][0]).toBe('http://srv/api/mesas/5/solicitacao?t=a%20b&clienteId=c%26d');
+  });
+
   it('sessaoAtual devolve null quando não há sessão', async () => {
     const f = jest.fn().mockReturnValue(resposta(200, { sessao: null }));
     expect(await new AooobaApi('http://srv', f as unknown as typeof fetch).sessaoAtual({ mesa: 3, token: 't' })).toBeNull();

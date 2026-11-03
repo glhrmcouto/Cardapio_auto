@@ -15,6 +15,9 @@ export interface ProdutoMenu {
   categoria: Categoria;
 }
 
+/** Pedido de entrada numa mesa bloqueada, decidido pelo garçom (fila de aprovação). */
+export type StatusSolicitacao = 'pendente' | 'aprovada' | 'recusada';
+
 export interface SessaoAtual {
   sessao_id: string;
   token_sessao: string;

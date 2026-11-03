@@ -3,7 +3,8 @@
 Backend do app mobile (`../aooba-mobile`). Fala com o **mesmo Postgres do Supabase** do `../aooba-react`.
 As regras de negócio (token de mesa/sessão, trava de mesa, rateio, taxa de serviço) continuam nas funções SQL de
 `../aooba-react/supabase/`; a API as chama via Drizzle (`db.execute(sql...)`) e usa o query builder nas leituras simples.
-**Nenhuma regra foi duplicada e o banco não foi alterado.**
+**Nenhuma regra foi duplicada.** O banco só ganhou a migração `../aooba-react/supabase/025_fila_aprovacao.sql` (fila de
+aprovação: o cliente informa o nome e o garçom confirma que ele está na mesa) — rode-a no Supabase antes de usar as rotas `/solicitacao`.
 
 ## Rodar
 
@@ -23,6 +24,8 @@ npm run typecheck
 | `GET /api/mesas/:mesa/status?t=TOKEN` | — | `status_da_mesa` |
 | `GET /api/mesas/:mesa/sessao?t=TOKEN` | — | `sessao_atual` (só lê; `sessao: null` se não houver) |
 | `POST /api/mesas/:mesa/sessao` | `{ t }` | `abrir_sessao` |
+| `POST /api/mesas/:mesa/solicitacao` | `{ t, clienteId, nome }` | `solicitar_entrada` (fila de aprovação do garçom; exige a migração `025`) |
+| `GET /api/mesas/:mesa/solicitacao?t=TOKEN&clienteId=UUID` | — | `status_solicitacao` (`pendente`/`aprovada`/`recusada`, ou `null`) |
 | `POST /api/pedidos` | `{ mesa, token, itens[{produtoId, quantidade, compartilhado}], clienteNome, clienteId, tokenSessao }` | `criar_pedido` |
 | `POST /api/conta` | `{ mesa, token, clienteId, tokenSessao }` | `conta_da_mesa` |
 | `POST /api/conta/fechar-parte` | `{ mesa, token, clienteId, aceitaTaxa }` | `fechar_parcial` |

@@ -41,6 +41,13 @@ React Native, os testes rodam com Jest puro e uma API falsa.
 - O preço não vai no payload do pedido; essência entra com preço 0; só narguilé pode ser dividido.
 - Carrinho é mantido se o pedido falhar.
 
+## Fila de aprovação (novo)
+
+Na **mesa bloqueada** o cliente digita o nome e toca "Pedir liberação"; o garçom vê "João — Mesa 5" na aba **Fila** do
+`/garcom`, confirma que a pessoa está lá e aprova (ou recusa). O app acompanha por polling (8 s): aprovada → "Iniciar
+pedido"; recusada → "Pedido não aprovado" e dá para pedir de novo. Aprovar libera a **mesa** (como o botão "Liberar mesa"),
+então a defesa continua sendo o servidor. Exige a migração `../aooba-react/supabase/025_fila_aprovacao.sql`.
+
 ## Diferenças em relação ao web
 
 - **Sem Realtime:** o web assinava `sessoes` no Supabase; aqui um polling de 10 s (`sessao_atual`) detecta a conta fechada.

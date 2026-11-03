@@ -1,4 +1,4 @@
-import type { AcessoMesa, ContaCliente, PedidoCriado, ProdutoMenu, SessaoAtual } from './types';
+import type { AcessoMesa, ContaCliente, PedidoCriado, ProdutoMenu, SessaoAtual, StatusSolicitacao } from './types';
 import type { ItemCarrinho } from './carrinho';
 import { itensParaApi } from './carrinho';
 
@@ -23,6 +23,10 @@ export interface CardapioApi {
   statusMesa(a: AcessoMesa): Promise<'liberada' | 'bloqueada'>;
   sessaoAtual(a: AcessoMesa): Promise<SessaoAtual | null>;
   abrirSessao(a: AcessoMesa): Promise<SessaoAtual>;
+  /** Pede ao garçom para confirmar que `nome` está na mesa. Mesa já liberada responde 'aprovada'. */
+  solicitarEntrada(a: AcessoMesa, p: { clienteId: string; nome: string }): Promise<StatusSolicitacao>;
+  /** Decisão mais recente do garçom para esta pessoa na mesa, ou null se nunca pediu. */
+  statusSolicitacao(a: AcessoMesa, clienteId: string): Promise<StatusSolicitacao | null>;
   criarPedido(p: { acesso: AcessoMesa; itens: ItemCarrinho[]; clienteNome: string; clienteId: string; tokenSessao: string | null }): Promise<PedidoCriado>;
   conta(p: { acesso: AcessoMesa; clienteId: string | null; tokenSessao: string | null }): Promise<ContaCliente>;
   fecharMinhaParte(p: { acesso: AcessoMesa; clienteId: string; aceitaTaxa: boolean }): Promise<{ valor_total: number }>;
@@ -86,6 +90,21 @@ export class AooobaApi implements CardapioApi {
   async abrirSessao({ mesa, token }: AcessoMesa) {
     const r = await this.chamar<{ sessao: SessaoAtual }>(`/api/mesas/${mesa}/sessao`, { method: 'POST', corpo: { t: token } });
     return r.sessao;
+  }
+
+  async solicitarEntrada({ mesa, token }: AcessoMesa, p: { clienteId: string; nome: string }) {
+    const r = await this.chamar<{ status: StatusSolicitacao }>(`/api/mesas/${mesa}/solicitacao`, {
+      method: 'POST',
+      corpo: { t: token, clienteId: p.clienteId, nome: p.nome },
+    });
+    return r.status;
+  }
+
+  async statusSolicitacao({ mesa, token }: AcessoMesa, clienteId: string) {
+    const r = await this.chamar<{ status: StatusSolicitacao | null }>(
+      `/api/mesas/${mesa}/solicitacao?t=${encodeURIComponent(token)}&clienteId=${encodeURIComponent(clienteId)}`,
+    );
+    return r.status;
   }
 
   async criarPedido(p: Parameters<CardapioApi['criarPedido']>[0]) {

@@ -1,15 +1,37 @@
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { TelaSessao } from '../viewmodel/SessaoViewModel';
 import { Botao } from './components/Botao';
-import { cores } from './theme';
+import { cores, raio } from './theme';
+
+/** Fila de aprovação da mesa bloqueada (ver SessaoViewModel.pedirLiberacao). */
+export interface BloqueioMesa {
+  solicitacao: 'pendente' | 'recusada' | null;
+  nomeSolicitado: string;
+  nomeSugerido: string;
+  enviando: boolean;
+  pedirLiberacao: (nome: string) => void;
+}
+
+const NOME_MAX = 20;
 
 interface Conteudo {
   titulo: string;
   texto: string;
 }
 
-function conteudoDaTela(tela: TelaSessao, mesa: number): Conteudo | null {
+function conteudoBloqueio(mesa: number, b?: BloqueioMesa): Conteudo {
+  if (b?.solicitacao === 'pendente') {
+    return { titulo: 'Aguardando o garçom', texto: `${b.nomeSolicitado}, o garçom vai confirmar que você está na Mesa ${mesa}. Esta tela atualiza sozinha.` };
+  }
+  if (b?.solicitacao === 'recusada') {
+    return { titulo: 'Pedido não aprovado', texto: 'O garçom não confirmou sua presença nesta mesa. Chame um atendente ou tente de novo.' };
+  }
+  return { titulo: 'Mesa aguardando liberação', texto: `Diga seu nome para o garçom confirmar que você está na Mesa ${mesa}.` };
+}
+
+function conteudoDaTela(tela: TelaSessao, mesa: number, bloqueio?: BloqueioMesa): Conteudo | null {
   switch (tela) {
     case 'sem_conexao':
       return { titulo: 'Sem conexão', texto: 'Não conseguimos confirmar sua mesa agora. Verifique a internet e tente de novo.' };
@@ -24,7 +46,7 @@ function conteudoDaTela(tela: TelaSessao, mesa: number): Conteudo | null {
     case 'entrada_cancelada':
       return { titulo: 'Tudo bem', texto: `Se quiser pedir na Mesa ${mesa}, escaneie o QR code da mesa novamente.` };
     case 'mesa_bloqueada':
-      return { titulo: 'Mesa aguardando liberação', texto: 'Chame um atendente para liberar o pedido nesta mesa. Esta tela atualiza sozinha.' };
+      return conteudoBloqueio(mesa, bloqueio);
     default:
       return null; // 'carregando' e 'liberada' não têm texto
   }
@@ -43,10 +65,15 @@ interface Props {
   mesa: number;
   acoes: AcoesTrava;
   aoEscanearDeNovo: () => void;
+  bloqueio?: BloqueioMesa;
 }
 
 /** Tudo que bloqueia o cardápio. O cardápio só aparece quando a tela é 'liberada'. */
-export function TravaView({ tela, abrindo, mesa, acoes, aoEscanearDeNovo }: Props) {
+export function TravaView({ tela, abrindo, mesa, acoes, aoEscanearDeNovo, bloqueio }: Props) {
+  // null = a pessoa ainda não digitou: vale o nome lembrado (que chega do armazenamento depois da 1ª renderização).
+  const [digitado, setNome] = useState<string | null>(null);
+  const nome = digitado ?? bloqueio?.nomeSugerido ?? '';
+
   if (tela === 'carregando') {
     return (
       <View style={estilos.centro}>
@@ -56,8 +83,10 @@ export function TravaView({ tela, abrindo, mesa, acoes, aoEscanearDeNovo }: Prop
     );
   }
 
-  const conteudo = conteudoDaTela(tela, mesa);
+  const conteudo = conteudoDaTela(tela, mesa, bloqueio);
   if (!conteudo) return null;
+  // Só pede o nome enquanto ainda não há pedido na fila (ou depois de uma recusa).
+  const pedeNome = tela === 'mesa_bloqueada' && !!bloqueio && bloqueio.solicitacao !== 'pendente';
 
   return (
     <SafeAreaView style={estilos.centro}>
@@ -66,7 +95,30 @@ export function TravaView({ tela, abrindo, mesa, acoes, aoEscanearDeNovo }: Prop
       </Text>
       <Text style={estilos.texto}>{conteudo.texto}</Text>
 
+      {pedeNome && (
+        <TextInput
+          style={estilos.input}
+          value={nome}
+          onChangeText={setNome}
+          maxLength={NOME_MAX}
+          placeholder="Seu nome. Ex: João"
+          placeholderTextColor={cores.cinzaEscuro}
+          autoCorrect={false}
+          returnKeyType="send"
+          onSubmitEditing={() => bloqueio.pedirLiberacao(nome)}
+          accessibilityLabel="Seu nome"
+        />
+      )}
+
       <View style={estilos.acoes}>
+        {pedeNome && (
+          <Botao
+            titulo={bloqueio.solicitacao === 'recusada' ? 'Tentar de novo' : 'Pedir liberação'}
+            carregando={bloqueio.enviando}
+            desabilitado={!nome.trim()}
+            onPress={() => bloqueio.pedirLiberacao(nome)}
+          />
+        )}
         {tela === 'boas_vindas' && <Botao titulo="Iniciar pedido" carregando={abrindo} onPress={acoes.iniciarPedido} />}
         {tela === 'confirmar_entrada' && (
           <>
@@ -89,4 +141,5 @@ const estilos = StyleSheet.create({
   titulo: { color: cores.laranja, fontSize: 26, fontWeight: '800', textAlign: 'center' },
   texto: { color: cores.cinza, fontSize: 16, textAlign: 'center', lineHeight: 23 },
   acoes: { alignSelf: 'stretch', gap: 12, marginTop: 8 },
+  input: { alignSelf: 'stretch', backgroundColor: cores.preto2, color: cores.branco, borderWidth: 1, borderColor: cores.borda, borderRadius: raio.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 },
 });

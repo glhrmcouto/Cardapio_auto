@@ -2,7 +2,7 @@ import { asc, eq, sql, type SQL } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { produtos } from '../db/schema.js';
 import { traduzirErroPg } from '../errors.js';
-import type { ClienteRepository, Credencial, PedidoCriado, SessaoAtual } from '../domain.js';
+import type { ClienteRepository, Credencial, PedidoCriado, SessaoAtual, StatusSolicitacao } from '../domain.js';
 
 /**
  * As regras (token de mesa/sessão, trava de mesa bloqueada, rateio, taxa de serviço) vivem em funções
@@ -42,6 +42,20 @@ export class PgClienteRepository implements ClienteRepository {
 
   async abrirSessao({ mesa, token }: Credencial) {
     const { r } = await this.linha<{ r: SessaoAtual }>(sql`select public.abrir_sessao(${mesa}::int, ${token}::text) as r`);
+    return r;
+  }
+
+  async solicitarEntrada({ mesa, token, clienteId, nome }: Parameters<ClienteRepository['solicitarEntrada']>[0]) {
+    const { r } = await this.linha<{ r: { id: string | null; status: StatusSolicitacao } }>(
+      sql`select public.solicitar_entrada(${mesa}::int, ${token}::text, ${clienteId}::uuid, ${nome}::text) as r`,
+    );
+    return r;
+  }
+
+  async statusSolicitacao({ mesa, token, clienteId }: Parameters<ClienteRepository['statusSolicitacao']>[0]) {
+    const { r } = await this.linha<{ r: StatusSolicitacao | null }>(
+      sql`select public.status_solicitacao(${mesa}::int, ${token}::text, ${clienteId}::uuid) as r`,
+    );
     return r;
   }
 

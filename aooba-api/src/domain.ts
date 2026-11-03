@@ -24,6 +24,13 @@ export interface Credencial {
   token: string;
 }
 
+export type StatusSolicitacao = 'pendente' | 'aprovada' | 'recusada';
+
+export interface PedidoEntrada extends Credencial {
+  clienteId: string;
+  nome: string;
+}
+
 export interface NovoPedido extends Credencial {
   itens: ItemPedido[];
   clienteNome: string;
@@ -47,6 +54,9 @@ export interface ClienteRepository {
   statusDaMesa(c: Credencial): Promise<'liberada' | 'bloqueada'>;
   sessaoAtual(c: Credencial): Promise<SessaoAtual | null>;
   abrirSessao(c: Credencial): Promise<SessaoAtual>;
+  /** Fila de aprovação: o cliente pede entrada numa mesa bloqueada com o nome que o garçom vai confirmar. */
+  solicitarEntrada(p: PedidoEntrada): Promise<{ id: string | null; status: StatusSolicitacao }>;
+  statusSolicitacao(c: Credencial & { clienteId: string }): Promise<StatusSolicitacao | null>;
   criarPedido(p: NovoPedido): Promise<PedidoCriado>;
   contaDaMesa(c: Credencial & { clienteId: string | null; tokenSessao: string | null }): Promise<unknown>;
   fecharParcial(c: Credencial & { clienteId: string; aceitaTaxa: boolean }): Promise<{ valor_total: number }>;

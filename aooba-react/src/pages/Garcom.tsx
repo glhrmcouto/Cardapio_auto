@@ -7,12 +7,12 @@ import { formatarHorario, formatarPreco } from '../lib/shared';
 import { ListaItens } from '../components/ContaViews';
 import { NovoPedidoModal } from './garcom/NovoPedidoModal';
 import { ContaMesaModal } from './garcom/ContaMesaModal';
-import type { Papel, Pedido, PedidoComItens, PedidoItem, Sessao } from '../lib/types';
+import type { Papel, Pedido, PedidoComItens, PedidoItem, Sessao, SolicitacaoEntrada } from '../lib/types';
 import '../styles/balcao.css';
 import '../styles/garcom.css';
 
 const INTERVALO_POLL_MESAS = 5000;
-type Aba = 'mesas' | 'pedidos';
+type Aba = 'mesas' | 'fila' | 'pedidos';
 
 const porCriacao = (a: PedidoComItens, b: PedidoComItens) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
 
@@ -28,6 +28,10 @@ function GarcomConteudo({ papel, sair }: { papel: Papel | null; sair: () => void
   const [pedidosErro, setPedidosErro] = useState(false);
   const [novoPedidoMesa, setNovoPedidoMesa] = useState<number | null>(null);
   const [contaMesa, setContaMesa] = useState<number | null>(null);
+  const [fila, setFila] = useState<SolicitacaoEntrada[]>([]);
+  const [filaCarregando, setFilaCarregando] = useState(true);
+  const [filaErro, setFilaErro] = useState(false);
+  const [decidindo, setDecidindo] = useState<string | null>(null);
 
   const carregarSessoes = useCallback(async () => {
     const { data, error } = await supabase.from('sessoes').select('id, mesa').eq('status', 'aberta');
@@ -66,10 +70,24 @@ function GarcomConteudo({ papel, sair }: { papel: Papel | null; sair: () => void
     setPedidosCarregando(false);
   }, []);
 
+  const carregarFila = useCallback(async (silencioso = false) => {
+    if (!silencioso) setFilaCarregando(true);
+    const { data, error } = await supabase.rpc('listar_solicitacoes');
+    if (error) {
+      console.error('Erro ao carregar a fila de aprovação:', error);
+      if (!silencioso) setFilaErro(true);
+    } else {
+      setFilaErro(false);
+      setFila(data as SolicitacaoEntrada[]);
+    }
+    setFilaCarregando(false);
+  }, []);
+
   useEffect(() => {
     void carregarMesas();
     void carregarPedidos();
-  }, [carregarMesas, carregarPedidos]);
+    void carregarFila();
+  }, [carregarMesas, carregarPedidos, carregarFila]);
 
   // Realtime de sessões e pedidos.
   useEffect(() => {
@@ -96,6 +114,10 @@ function GarcomConteudo({ papel, sair }: { papel: Papel | null; sair: () => void
         const atual = p.new as Pedido;
         if (atual.tipo === 'pedido' && atual.status !== 'pendente') setPedidos((l) => l.filter((x) => x.id !== atual.id));
       })
+      // Fila de aprovação: qualquer mudança só recarrega a lista (a RPC já filtra o que vale).
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitacoes_entrada' }, () => {
+        void carregarFila(true);
+      })
       .subscribe();
     return () => {
       void supabase.removeChannel(canal);
@@ -106,7 +128,7 @@ function GarcomConteudo({ papel, sair }: { papel: Papel | null; sair: () => void
   // Polling: "mesas" não está no Realtime (token secreto).
   useEffect(() => {
     const id = window.setInterval(() => {
-      Promise.all([controle.carregar(), carregarSessoes()]).catch((e) => console.error('Erro no polling de mesas:', e));
+      Promise.all([controle.carregar(), carregarSessoes(), carregarFila(true)]).catch((e) => console.error('Erro no polling de mesas:', e));
     }, INTERVALO_POLL_MESAS);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -120,6 +142,36 @@ function GarcomConteudo({ papel, sair }: { papel: Papel | null; sair: () => void
       return;
     }
     setPedidos((l) => l.filter((p) => p.id !== id));
+  }
+
+  /** O garçom confirma que a pessoa está mesmo na mesa; aprovar libera a mesa. */
+  async function aprovar(sol: SolicitacaoEntrada) {
+    if (!window.confirm(`Confirma que "${sol.nome}" está na Mesa ${sol.mesa}? A mesa será liberada para pedidos.`)) return;
+    setDecidindo(sol.id);
+    const { error } = await supabase.rpc('aprovar_solicitacao', { p_id: sol.id });
+    setDecidindo(null);
+    if (error) {
+      console.error('Erro ao aprovar solicitação:', error);
+      window.alert('Não foi possível aprovar agora. Pode já ter sido decidido por outro atendente.');
+      void carregarFila(true);
+      return;
+    }
+    setFila((l) => l.filter((x) => x.id !== sol.id));
+    controle.atualizarLocal(sol.mesa, 'liberada');
+    toast(`${sol.nome} confirmado(a) na Mesa ${sol.mesa}.`);
+  }
+
+  async function recusar(sol: SolicitacaoEntrada) {
+    setDecidindo(sol.id);
+    const { error } = await supabase.rpc('recusar_solicitacao', { p_id: sol.id });
+    setDecidindo(null);
+    if (error) {
+      console.error('Erro ao recusar solicitação:', error);
+      window.alert('Não foi possível recusar agora. Pode já ter sido decidido por outro atendente.');
+      void carregarFila(true);
+      return;
+    }
+    setFila((l) => l.filter((x) => x.id !== sol.id));
   }
 
   const mesasComSessao = new Set(sessoes.map((s) => String(s.mesa)));
@@ -220,6 +272,41 @@ function GarcomConteudo({ papel, sair }: { papel: Papel | null; sair: () => void
           </div>
         </section>
 
+        <section className="garcom-aba" hidden={aba !== 'fila'}>
+          {filaCarregando && <p className="cardapio-status">Carregando fila...</p>}
+          {filaErro && (
+            <div className="cardapio-status cardapio-status--erro">
+              <p>Não foi possível carregar a fila agora. Verifique sua conexão e tente de novo.</p>
+              <button type="button" className="btn btn--secondary" onClick={() => void carregarFila()}>
+                Tentar novamente
+              </button>
+            </div>
+          )}
+          {!filaCarregando && !filaErro && fila.length === 0 && <p className="balcao-vazio">Ninguém aguardando aprovação.</p>}
+
+          <div className="balcao-grid">
+            {fila.map((sol) => (
+              <div className="pedido-card" key={sol.id}>
+                <div>
+                  <div className="pedido-card__mesa">Mesa {sol.mesa}</div>
+                  <div className="pedido-card__cliente">{sol.nome}</div>
+                  <div className="pedido-card__horario">{formatarHorario(sol.criado_em)}</div>
+                  <span className="pedido-card__status">Aguardando aprovação</span>
+                </div>
+                <p className="fila-pergunta">
+                  {sol.nome} está na Mesa {sol.mesa}?
+                </p>
+                <button type="button" className="btn btn--primary pedido-card__entregar" disabled={decidindo === sol.id} onClick={() => void aprovar(sol)}>
+                  Confirmar na mesa
+                </button>
+                <button type="button" className="btn btn--secondary" disabled={decidindo === sol.id} onClick={() => void recusar(sol)}>
+                  Recusar
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="garcom-aba" hidden={aba !== 'pedidos'}>
           {pedidosCarregando && <p className="cardapio-status">Carregando pedidos...</p>}
           {pedidosErro && (
@@ -255,6 +342,12 @@ function GarcomConteudo({ papel, sair }: { papel: Papel | null; sair: () => void
       <nav className="garcom-tabbar" aria-label="Navegação principal">
         <button type="button" className={`garcom-tabbar__item${aba === 'mesas' ? ' is-ativo' : ''}`} aria-current={aba === 'mesas' ? 'page' : 'false'} onClick={() => setAba('mesas')}>
           <span className="garcom-tabbar__label">Mesas</span>
+        </button>
+        <button type="button" className={`garcom-tabbar__item${aba === 'fila' ? ' is-ativo' : ''}`} aria-current={aba === 'fila' ? 'page' : 'false'} onClick={() => setAba('fila')}>
+          <span className="garcom-tabbar__label">Fila</span>
+          <span className="garcom-tabbar__badge" hidden={fila.length === 0}>
+            {fila.length}
+          </span>
         </button>
         <button type="button" className={`garcom-tabbar__item${aba === 'pedidos' ? ' is-ativo' : ''}`} aria-current={aba === 'pedidos' ? 'page' : 'false'} onClick={() => setAba('pedidos')}>
           <span className="garcom-tabbar__label">Pedidos</span>

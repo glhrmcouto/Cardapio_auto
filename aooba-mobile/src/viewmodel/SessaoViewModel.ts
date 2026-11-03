@@ -13,7 +13,8 @@ import { ViewModel } from './ViewModel';
  *  conta_encerrada   — este aparelho tinha sessão que já fechou;
  *  confirmar_entrada — já há sessão aberta e este aparelho não a tinha ("Entrar na conta");
  *  entrada_cancelada — a pessoa recusou entrar;
- *  mesa_bloqueada    — aguardando liberação do garçom (polling);
+ *  mesa_bloqueada    — aguardando liberação do garçom (polling); a pessoa informa o nome e o garçom
+ *                      confirma que ela está na mesa (fila de aprovação, ver `solicitacao`);
  *  liberada          — pode pedir.
  */
 export type TelaSessao = 'carregando' | 'sem_conexao' | 'qr_invalido' | 'boas_vindas' | 'conta_encerrada' | 'confirmar_entrada' | 'entrada_cancelada' | 'mesa_bloqueada' | 'liberada';
@@ -26,12 +27,24 @@ export interface EstadoSessao {
   sessaoId: string | null;
   tokenSessao: string | null;
   abrindo: boolean;
+  /**
+   * Fila de aprovação (só na tela `mesa_bloqueada`): null = ainda não pediu; 'pendente' = o garçom vai
+   * confirmar que `nomeSolicitado` está na mesa; 'recusada' = o garçom não confirmou.
+   */
+  solicitacao: 'pendente' | 'recusada' | null;
+  nomeSolicitado: string;
+  /** Nome lembrado no aparelho, para pré-preencher o pedido de liberação. */
+  nomeSugerido: string;
+  enviandoSolicitacao: boolean;
   /** Mensagem passageira para a View mostrar (toast). `id` muda a cada aviso novo. */
   aviso: { id: number; texto: string } | null;
 }
 
 /** Mesa/token recusados pelo servidor (erro de regra), diferente de rede fora do ar. */
 const erroDeQr = (e: unknown) => e instanceof ErroApi && (e.codigo === 'ERRO_NEGOCIO' || e.codigo === 'DADOS_INVALIDOS');
+
+/** Mesmo limite do nome no pedido e da `solicitar_entrada` no banco. */
+const NOME_MAX_SOLICITACAO = 20;
 
 export const INTERVALO_POLL_BLOQUEADA_MS = 8000;
 export const INTERVALO_POLL_SESSAO_MS = 10000;
@@ -46,7 +59,17 @@ export class SessaoViewModel extends ViewModel<EstadoSessao> {
     private readonly api: CardapioApi,
     private readonly armazenamento: ArmazenamentoLocal,
   ) {
-    super({ tela: 'carregando', sessaoId: null, tokenSessao: null, abrindo: false, aviso: null });
+    super({
+      tela: 'carregando',
+      sessaoId: null,
+      tokenSessao: null,
+      abrindo: false,
+      solicitacao: null,
+      nomeSolicitado: '',
+      nomeSugerido: '',
+      enviandoSolicitacao: false,
+      aviso: null,
+    });
   }
 
   private avisar(texto: string) {
@@ -60,8 +83,47 @@ export class SessaoViewModel extends ViewModel<EstadoSessao> {
 
   private ir(tela: TelaSessao) {
     this.pararPolling();
-    this.setState({ tela, sessaoId: null, tokenSessao: null });
-    if (tela === 'mesa_bloqueada') this.timer = setInterval(() => void this.checarLiberacao(), INTERVALO_POLL_BLOQUEADA_MS);
+    this.setState({ tela, sessaoId: null, tokenSessao: null, solicitacao: null, nomeSolicitado: '' });
+    if (tela === 'mesa_bloqueada') {
+      this.timer = setInterval(() => void this.checarLiberacao(), INTERVALO_POLL_BLOQUEADA_MS);
+      void this.retomarSolicitacao();
+    }
+  }
+
+  /** Reabrir a tela não perde o pedido que já está na fila do garçom; erro de rede só deixa sem retomar. */
+  private async retomarSolicitacao() {
+    try {
+      const nomeSugerido = await this.armazenamento.lerNome();
+      const status = await this.api.statusSolicitacao(this.acesso, await this.armazenamento.clienteId());
+      if (this.getState().tela !== 'mesa_bloqueada') return;
+      this.setState(status === 'pendente' ? { nomeSugerido, solicitacao: 'pendente', nomeSolicitado: nomeSugerido } : { nomeSugerido });
+    } catch (erro) {
+      console.warn('Erro ao retomar o pedido de liberação:', erro);
+    }
+  }
+
+  /** Pede ao garçom para confirmar que `nome` está na mesa (fila de aprovação). */
+  async pedirLiberacao(nome: string) {
+    const limpo = nome.trim();
+    if (this.getState().enviandoSolicitacao) return;
+    if (!limpo || limpo.length > NOME_MAX_SOLICITACAO) {
+      this.avisar(`Informe seu nome (até ${NOME_MAX_SOLICITACAO} caracteres).`);
+      return;
+    }
+    this.setState({ enviandoSolicitacao: true });
+    try {
+      const status = await this.api.solicitarEntrada(this.acesso, { clienteId: await this.armazenamento.clienteId(), nome: limpo });
+      await this.armazenamento.gravarNome(limpo);
+      if (status === 'aprovada') {
+        await this.iniciar('retomada'); // a mesa já estava liberada
+      } else {
+        this.setState({ solicitacao: 'pendente', nomeSolicitado: limpo });
+      }
+    } catch (erro) {
+      this.avisar((erro as Error).message || 'Não foi possível pedir a liberação agora. Tente de novo.');
+    } finally {
+      this.setState({ enviandoSolicitacao: false });
+    }
   }
 
   private async liberar(sessao: SessaoAtual) {
@@ -171,7 +233,14 @@ export class SessaoViewModel extends ViewModel<EstadoSessao> {
 
   private async checarLiberacao() {
     try {
-      if ((await this.api.statusMesa(this.acesso)) === 'liberada') await this.iniciar('retomada');
+      if ((await this.api.statusMesa(this.acesso)) === 'liberada') {
+        await this.iniciar('retomada');
+        return;
+      }
+      if (this.getState().solicitacao === 'pendente') {
+        const status = await this.api.statusSolicitacao(this.acesso, await this.armazenamento.clienteId());
+        if (status === 'recusada' && this.getState().solicitacao === 'pendente') this.setState({ solicitacao: 'recusada' });
+      }
     } catch (erro) {
       console.warn('Erro ao checar liberação da mesa:', erro);
     }

@@ -166,6 +166,9 @@ Cliente (`/?mesa=N&t=TOKEN`, use o link de uma mesa de teste):
 - [ ] Fechar conta: "Minha parte" (com/sem taxa) e "Fechar a conta toda"; saldo e status por pessoa.
 - [ ] Balcão fecha a conta → o cliente vê "Conta encerrada"; F5 e reabrir a aba **não** liberam o cardápio.
 - [ ] Mesa bloqueada → "aguardando liberação" e destrava sozinha ~8 s depois de liberar.
+- [ ] Fila de aprovação (app mobile + migração `025`): na mesa bloqueada o cliente digita o nome e toca "Pedir liberação" →
+      "Aguardando o garçom"; no `/garcom`, aba **Fila**, aparece "João — Mesa N"; "Confirmar na mesa" pergunta pelo nome e libera
+      (o app vai para "Iniciar pedido" em ~8 s); "Recusar" mantém a mesa bloqueada e o app mostra "Pedido não aprovado".
 - [ ] Sem internet → faixa vermelha.
 
 Balcão (`/balcao`): pedido novo chega em tempo real com beep (clicar em "Ativar som" antes); "Entregue"; remover item e
@@ -173,7 +176,7 @@ fechar mesa pedem senha; pagamento parcial → "Recebido" (encerra sozinho se qu
 Controle de Mesas (liberar/desativar/ativar, "Liberar todas", "Bloquear todas" com segunda confirmação); indicador de
 conexão.
 
-Garçom (`/garcom`, celular): abas; "Novo pedido" só para papel `garcom`; "Ver conta"/"Fechar conta"; entrega de pedido;
+Garçom (`/garcom`, celular): abas (Mesas, **Fila**, Pedidos); "Novo pedido" só para papel `garcom`; "Ver conta"/"Fechar conta"; entrega de pedido;
 logar como garçom e admin ao mesmo tempo em abas diferentes.
 
 Admin: criar/editar/ordenar/ativar/excluir produto (excluir produto já pedido deve recusar e sugerir desativar);

@@ -21,13 +21,14 @@ const PEDIDO = {
 };
 const CONTA = { itens: [{ nome: 'Caipirinha', preco: 20, quantidade: 2 }], total_geral: 44 };
 
-function preparar(papel: 'garcom' | 'balcao' | 'admin' = 'garcom', extra: { pedidos?: unknown[]; sessoes?: unknown[] } = {}) {
+function preparar(papel: 'garcom' | 'balcao' | 'admin' = 'garcom', extra: { pedidos?: unknown[]; sessoes?: unknown[]; fila?: unknown[] } = {}) {
   logadoComo(papel, 'garcom');
   mockTabela('sessoes', { select: extra.sessoes ?? [SESSAO_MESA_3] });
   mockTabela('pedidos', { select: extra.pedidos ?? [], update: [] });
   mockTabela('produtos', { select: PRODUTOS });
   mockRpc('listar_mesas_balcao', MESAS);
   mockRpc('conta_da_mesa_balcao', CONTA);
+  mockRpc('listar_solicitacoes', extra.fila ?? []);
 }
 
 const cardMesa = async (n: number) => (await screen.findByText(`Mesa ${n}`, { selector: '.controle-mesa-card__mesa' })).closest('.controle-mesa-card') as HTMLElement;
@@ -275,7 +276,7 @@ describe('Garçom — conta da mesa e pedidos (MSW)', () => {
     await userEvent.click(screen.getByRole('button', { name: /Pedidos/ }));
     const card = (await screen.findByText('Ana')).closest('.pedido-card') as HTMLElement;
     expect(within(card).getByText('2x Caipirinha')).toBeInTheDocument();
-    expect(document.querySelector('.garcom-tabbar__badge')).toHaveTextContent('1');
+    expect(document.querySelectorAll('.garcom-tabbar__badge')[1]).toHaveTextContent('1'); // [0] é o da Fila
     expect(chamadasTabela('pedidos', 'GET')[0].query).toMatchObject({ tipo: 'eq.pedido', status: 'eq.pendente' });
 
     await userEvent.click(within(card).getByRole('button', { name: 'Entregue' }));
@@ -289,5 +290,89 @@ describe('Garçom — conta da mesa e pedidos (MSW)', () => {
     await cardMesa(1);
     await userEvent.click(screen.getByRole('button', { name: /Pedidos/ }));
     expect(await screen.findByText('Nenhum pedido pendente no momento.')).toBeInTheDocument();
+  });
+});
+
+describe('Garçom — fila de aprovação (MSW)', () => {
+  const JOAO = { id: 'sol-1', mesa: 2, nome: 'João', criado_em: '2026-03-01T22:10:00Z' };
+  const abrirFila = () => userEvent.click(screen.getByRole('button', { name: /Fila/ }));
+  const cardJoao = async () => (await screen.findByText('João', { selector: '.pedido-card__cliente' })).closest('.pedido-card') as HTMLElement;
+
+  it('lista quem aguarda, com nome e mesa, e mostra o badge', async () => {
+    preparar('garcom', { fila: [JOAO] });
+    renderPagina(<Garcom />);
+    await cardMesa(1);
+
+    await abrirFila();
+    const card = await cardJoao();
+    expect(within(card).getByText('Mesa 2')).toBeInTheDocument();
+    expect(within(card).getByText('João está na Mesa 2?')).toBeInTheDocument();
+    expect(document.querySelectorAll('.garcom-tabbar__badge')[0]).toHaveTextContent('1');
+  });
+
+  it('"Confirmar na mesa" pergunta pelo nome, aprova (RPC) e libera a mesa na tela', async () => {
+    preparar('garcom', { fila: [JOAO] });
+    mockRpc('aprovar_solicitacao', null);
+    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderPagina(<Garcom />);
+    await cardMesa(1);
+
+    await abrirFila();
+    await userEvent.click(within(await cardJoao()).getByRole('button', { name: 'Confirmar na mesa' }));
+
+    expect(confirmar).toHaveBeenCalledWith(expect.stringContaining('"João" está na Mesa 2'));
+    await waitFor(() => expect(chamadasRpc('aprovar_solicitacao')[0]?.body).toEqual({ p_id: 'sol-1' }));
+    await waitFor(() => expect(screen.getByText('Ninguém aguardando aprovação.')).toBeInTheDocument());
+    await waitFor(async () => expect(within(await cardMesa(2)).getByText('Liberada')).toBeInTheDocument());
+    expect(toast()).toHaveTextContent('João confirmado(a) na Mesa 2.');
+  });
+
+  it('se o garçom não confirma, nada é aprovado', async () => {
+    preparar('garcom', { fila: [JOAO] });
+    mockRpc('aprovar_solicitacao', null);
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderPagina(<Garcom />);
+    await cardMesa(1);
+
+    await abrirFila();
+    await userEvent.click(within(await cardJoao()).getByRole('button', { name: 'Confirmar na mesa' }));
+    expect(chamadasRpc('aprovar_solicitacao')).toHaveLength(0);
+    expect(await cardJoao()).toBeInTheDocument();
+  });
+
+  it('"Recusar" chama a RPC, tira da fila e a mesa continua bloqueada', async () => {
+    preparar('garcom', { fila: [JOAO] });
+    mockRpc('recusar_solicitacao', null);
+    renderPagina(<Garcom />);
+    await cardMesa(1);
+
+    await abrirFila();
+    await userEvent.click(within(await cardJoao()).getByRole('button', { name: 'Recusar' }));
+    await waitFor(() => expect(chamadasRpc('recusar_solicitacao')[0]?.body).toEqual({ p_id: 'sol-1' }));
+    await waitFor(() => expect(screen.getByText('Ninguém aguardando aprovação.')).toBeInTheDocument());
+    expect(within(await cardMesa(2)).getByText('Bloqueada')).toBeInTheDocument();
+  });
+
+  it('já decidido por outro atendente: avisa e mantém a tela consistente', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const alerta = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    preparar('garcom', { fila: [JOAO] });
+    mockRpc('aprovar_solicitacao', new ErroPg('Este pedido já foi decidido ou não existe mais.', { status: 400 }));
+    renderPagina(<Garcom />);
+    await cardMesa(1);
+
+    await abrirFila();
+    await userEvent.click(within(await cardJoao()).getByRole('button', { name: 'Confirmar na mesa' }));
+    await waitFor(() => expect(alerta).toHaveBeenCalled());
+    expect(within(await cardMesa(2)).getByText('Bloqueada')).toBeInTheDocument();
+  });
+
+  it('fila vazia mostra a mensagem de vazio', async () => {
+    preparar();
+    renderPagina(<Garcom />);
+    await cardMesa(1);
+    await abrirFila();
+    expect(await screen.findByText('Ninguém aguardando aprovação.')).toBeInTheDocument();
   });
 });

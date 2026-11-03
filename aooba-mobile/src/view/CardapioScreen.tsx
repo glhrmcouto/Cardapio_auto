@@ -92,7 +92,20 @@ export function CardapioScreen({ acesso, aoEscanearDeNovo }: Props) {
   if (!liberada) {
     return (
       <>
-        <TravaView tela={sessao.tela} abrindo={sessao.abrindo} mesa={acesso.mesa} acoes={acoesTrava} aoEscanearDeNovo={aoEscanearDeNovo} />
+        <TravaView
+          tela={sessao.tela}
+          abrindo={sessao.abrindo}
+          mesa={acesso.mesa}
+          acoes={acoesTrava}
+          aoEscanearDeNovo={aoEscanearDeNovo}
+          bloqueio={{
+            solicitacao: sessao.solicitacao,
+            nomeSolicitado: sessao.nomeSolicitado,
+            nomeSugerido: sessao.nomeSugerido,
+            enviando: sessao.enviandoSolicitacao,
+            pedirLiberacao: (nome) => void sessaoVm.pedirLiberacao(nome),
+          }}
+        />
         <Aviso aviso={sessao.aviso} />
       </>
     );

@@ -12,6 +12,8 @@ function repoFalso(sobrescrever: Partial<ClienteRepository> = {}): ClienteReposi
     statusDaMesa: vi.fn().mockResolvedValue('liberada'),
     sessaoAtual: vi.fn().mockResolvedValue(null),
     abrirSessao: vi.fn().mockResolvedValue({ sessao_id: 's1', token_sessao: 'ts1' }),
+    solicitarEntrada: vi.fn().mockResolvedValue({ id: 'sol1', status: 'pendente' }),
+    statusSolicitacao: vi.fn().mockResolvedValue('pendente'),
     criarPedido: vi.fn().mockResolvedValue({ id: 'p1', mesa: 5, total: 40, status: 'pendente' }),
     contaDaMesa: vi.fn().mockResolvedValue({ total_geral: 40 }),
     fecharParcial: vi.fn().mockResolvedValue({ valor_total: 22 }),
@@ -80,6 +82,50 @@ describe('mesa e sessão', () => {
     const res = await request(criarApp(repo)).get('/api/mesas/abc/sessao?t=x');
     expect(res.status).toBe(400);
     expect(repo.sessaoAtual).not.toHaveBeenCalled();
+  });
+});
+
+describe('fila de aprovação', () => {
+  it('POST solicitação envia mesa, token, clienteId e nome ao repositório (201)', async () => {
+    const repo = repoFalso();
+    const res = await request(criarApp(repo)).post('/api/mesas/5/solicitacao').send({ t: 'abc', clienteId: UUID, nome: '  João ' });
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ id: 'sol1', status: 'pendente' });
+    expect(repo.solicitarEntrada).toHaveBeenCalledWith({ mesa: 5, token: 'abc', clienteId: UUID, nome: 'João' });
+  });
+
+  it('recusa nome vazio, nome com mais de 20 caracteres e clienteId inválido', async () => {
+    const repo = repoFalso();
+    const app = criarApp(repo);
+    for (const corpo of [
+      { t: 'abc', clienteId: UUID, nome: '   ' },
+      { t: 'abc', clienteId: UUID, nome: 'x'.repeat(21) },
+      { t: 'abc', clienteId: 'nao-e-uuid', nome: 'João' },
+    ]) {
+      const res = await request(app).post('/api/mesas/5/solicitacao').send(corpo);
+      expect(res.status).toBe(400);
+      expect(res.body.codigo).toBe('DADOS_INVALIDOS');
+    }
+    expect(repo.solicitarEntrada).not.toHaveBeenCalled();
+  });
+
+  it('GET solicitação devolve o status (ou null se nunca pediu)', async () => {
+    const repo = repoFalso({ statusSolicitacao: vi.fn().mockResolvedValue(null) });
+    const res = await request(criarApp(repo)).get(`/api/mesas/5/solicitacao?t=abc&clienteId=${UUID}`);
+    expect(res.body).toEqual({ status: null });
+    expect(repo.statusSolicitacao).toHaveBeenCalledWith({ mesa: 5, token: 'abc', clienteId: UUID });
+  });
+
+  it('GET solicitação exige token e clienteId', async () => {
+    const res = await request(criarApp(repoFalso())).get('/api/mesas/5/solicitacao?t=abc');
+    expect(res.status).toBe(400);
+  });
+
+  it('erro de regra do banco (ex.: QR inválido) volta como 400 com a mensagem', async () => {
+    const repo = repoFalso({ solicitarEntrada: vi.fn().mockRejectedValue(new ErroNegocio('Verifique o QR code da mesa.')) });
+    const res = await request(criarApp(repo)).post('/api/mesas/5/solicitacao').send({ t: 'abc', clienteId: UUID, nome: 'João' });
+    expect(res.status).toBe(400);
+    expect(res.body.mensagem).toBe('Verifique o QR code da mesa.');
   });
 });
 
