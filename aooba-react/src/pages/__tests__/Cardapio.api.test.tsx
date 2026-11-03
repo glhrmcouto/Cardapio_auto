@@ -35,6 +35,7 @@ function mesaLivre(rpcs: Record<string, unknown> = {}) {
   mockTabela('produtos', { select: PRODUTOS });
   mockRpc('sessao_atual', null);
   mockRpc('status_da_mesa', 'liberada');
+  mockRpc('status_solicitacao', null);
   mockRpc('abrir_sessao', SESSAO);
   mockRpc('criar_pedido', null);
   for (const [nome, valor] of Object.entries(rpcs)) mockRpc(nome, valor as never);
@@ -97,6 +98,7 @@ describe('Cardápio — sessão da mesa via API (MSW)', () => {
     mockTabela('produtos', { select: PRODUTOS });
     mockRpc('sessao_atual', null);
     mockRpc('status_da_mesa', 'bloqueada');
+    mockRpc('status_solicitacao', null);
     renderPagina(<Cardapio />, URL_MESA);
     expect(await screen.findByText('Mesa aguardando liberação')).toBeInTheDocument();
     expect(chamadasRpc('abrir_sessao')).toHaveLength(0);
@@ -349,5 +351,87 @@ describe('Cardápio — conta da mesa via API (MSW)', () => {
     await within(modal).findByText('Minha parte');
     await userEvent.click(within(modal).getByRole('button', { name: 'Fechar a conta toda' }));
     expect(await screen.findByText(/Foi um prazer ter você/)).toBeInTheDocument();
+  });
+});
+
+describe('Cardápio — fila de aprovação da mesa bloqueada (MSW)', () => {
+  function mesaBloqueada(status: unknown = null, rpcs: Record<string, unknown> = {}) {
+    mockTabela('produtos', { select: PRODUTOS });
+    mockRpc('sessao_atual', null);
+    mockRpc('status_da_mesa', 'bloqueada');
+    mockRpc('status_solicitacao', status as never);
+    mockRpc('solicitar_entrada', { id: 'sol-1', status: 'pendente' });
+    for (const [nome, valor] of Object.entries(rpcs)) mockRpc(nome, valor as never);
+  }
+  const pedirLiberacao = () => screen.getByRole('button', { name: 'Pedir liberação' });
+
+  it('pede o nome e envia solicitar_entrada; a tela passa a "Aguardando o garçom"', async () => {
+    mesaBloqueada();
+    renderPagina(<Cardapio />, URL_MESA);
+    await screen.findByText('Mesa aguardando liberação');
+    expect(pedirLiberacao()).toBeDisabled(); // sem nome
+
+    await userEvent.type(screen.getByLabelText('Seu nome'), '  João ');
+    await userEvent.click(pedirLiberacao());
+
+    expect(await screen.findByText('Aguardando o garçom')).toBeInTheDocument();
+    expect(screen.getByText(/João, o garçom vai confirmar que você está na Mesa 5/)).toBeInTheDocument();
+    expect(chamadasRpc('solicitar_entrada')[0].body).toMatchObject({ p_mesa: 5, p_token: 'TOKEN-MESA', p_nome: 'João' });
+    expect(chamadasRpc('solicitar_entrada')[0].body).toHaveProperty('p_cliente_id');
+    expect(screen.queryByLabelText('Seu nome')).not.toBeInTheDocument();
+    expect(sessionStorage.getItem('aooba_cliente_nome')).toBe('João'); // o cardápio não pergunta de novo
+    expect(chamadasRpc('abrir_sessao')).toHaveLength(0);
+  });
+
+  it('reabrir a página retoma um pedido que já está na fila, sem pedir de novo', async () => {
+    sessionStorage.setItem('aooba_cliente_nome', 'João');
+    mesaBloqueada('pendente');
+    renderPagina(<Cardapio />, URL_MESA);
+    expect(await screen.findByText('Aguardando o garçom')).toBeInTheDocument();
+    expect(chamadasRpc('solicitar_entrada')).toHaveLength(0);
+  });
+
+  it('erro ao pedir mostra a mensagem do servidor e deixa tentar de novo', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mesaBloqueada(null, { solicitar_entrada: new ErroPg('Muitos pedidos aguardando nesta mesa. Chame um atendente.') });
+    renderPagina(<Cardapio />, URL_MESA);
+    await screen.findByText('Mesa aguardando liberação');
+    await userEvent.type(screen.getByLabelText('Seu nome'), 'João');
+    await userEvent.click(pedirLiberacao());
+    await waitFor(() => expect(toast()).toHaveTextContent('Muitos pedidos aguardando nesta mesa.'));
+    expect(pedirLiberacao()).toBeEnabled();
+  });
+
+  it('garçom recusa: o polling mostra "Pedido não aprovado" e dá para pedir de novo', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mesaBloqueada();
+    renderPagina(<Cardapio />, URL_MESA);
+    await screen.findByText('Mesa aguardando liberação');
+    await userEvent.type(screen.getByLabelText('Seu nome'), 'João', { advanceTimers: vi.advanceTimersByTime });
+    await userEvent.click(pedirLiberacao());
+    await screen.findByText('Aguardando o garçom');
+
+    mockRpc('status_da_mesa', 'bloqueada');
+    mockRpc('status_solicitacao', 'recusada');
+    await vi.advanceTimersByTimeAsync(8500);
+    expect(await screen.findByText('Pedido não aprovado')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tentar de novo' })).toBeEnabled();
+    vi.useRealTimers();
+  });
+
+  it('garçom aprova (mesa liberada): o polling leva às boas-vindas, sem abrir sessão sozinho', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mesaBloqueada();
+    renderPagina(<Cardapio />, URL_MESA);
+    await screen.findByText('Mesa aguardando liberação');
+    await userEvent.type(screen.getByLabelText('Seu nome'), 'João', { advanceTimers: vi.advanceTimersByTime });
+    await userEvent.click(pedirLiberacao());
+    await screen.findByText('Aguardando o garçom');
+
+    mockRpc('status_da_mesa', 'liberada');
+    await vi.advanceTimersByTimeAsync(8500);
+    expect(await screen.findByText('Bem-vindo ao AOOBA! BAR')).toBeInTheDocument();
+    expect(chamadasRpc('abrir_sessao')).toHaveLength(0);
+    vi.useRealTimers();
   });
 });

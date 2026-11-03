@@ -166,9 +166,11 @@ Cliente (`/?mesa=N&t=TOKEN`, use o link de uma mesa de teste):
 - [ ] Fechar conta: "Minha parte" (com/sem taxa) e "Fechar a conta toda"; saldo e status por pessoa.
 - [ ] Balcão fecha a conta → o cliente vê "Conta encerrada"; F5 e reabrir a aba **não** liberam o cardápio.
 - [ ] Mesa bloqueada → "aguardando liberação" e destrava sozinha ~8 s depois de liberar.
-- [ ] Fila de aprovação (app mobile + migração `025`): na mesa bloqueada o cliente digita o nome e toca "Pedir liberação" →
-      "Aguardando o garçom"; no `/garcom`, aba **Fila**, aparece "João — Mesa N"; "Confirmar na mesa" pergunta pelo nome e libera
-      (o app vai para "Iniciar pedido" em ~8 s); "Recusar" mantém a mesa bloqueada e o app mostra "Pedido não aprovado".
+- [ ] Fila de aprovação (cardápio web **e** app mobile; exige a migração `025`): na mesa bloqueada o cliente digita o nome e
+      toca "Pedir liberação" → "Aguardando o garçom"; no `/garcom`, aba **Fila**, aparece "João — Mesa N"; "Confirmar na mesa"
+      pergunta pelo nome e libera (o cliente vai para "Iniciar pedido" em ~8 s); "Recusar" mantém a mesa bloqueada e o cliente
+      vê "Pedido não aprovado". Recarregar a página do cliente retoma o pedido pendente.
+      No web a lógica está em `pages/cardapio/useSessao.ts` (`pedirLiberacao`) e `TravaModal.tsx`.
 - [ ] Sem internet → faixa vermelha.
 
 Balcão (`/balcao`): pedido novo chega em tempo real com beep (clicar em "Ativar som" antes); "Entregue"; remover item e

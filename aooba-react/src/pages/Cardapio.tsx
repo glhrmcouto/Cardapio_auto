@@ -97,7 +97,7 @@ export default function Cardapio() {
   const [clienteNome, setClienteNome] = useState(() => lerClienteNome());
   const [nomeAberto, setNomeAberto] = useState(false);
 
-  const sessao = useSessao({ mesa: mesaAtual, tokenMesa, temAcessoValido });
+  const sessao = useSessao({ mesa: mesaAtual, tokenMesa, temAcessoValido, clienteId });
   const liberada = sessao.tela === 'liberada';
 
   // Cardápio só carrega depois de confirmar que esta aba pode pedir.
@@ -121,7 +121,10 @@ export default function Cardapio() {
   useEffect(() => {
     if (!liberada) return;
     void carregarMenu();
-    if (!clienteNome) setNomeAberto(true);
+    // O nome pode ter sido informado na fila de aprovação (mesa bloqueada), depois do 1º render.
+    const salvo = lerClienteNome();
+    setClienteNome(salvo);
+    if (!salvo) setNomeAberto(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liberada]);
 
