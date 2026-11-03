@@ -46,7 +46,17 @@ drop policy if exists solicitacoes_select_authenticated on public.solicitacoes_e
 create policy solicitacoes_select_authenticated on public.solicitacoes_entrada
   for select to authenticated using (true);
 
-alter publication supabase_realtime add table public.solicitacoes_entrada;
+-- Realtime da fila (idempotente: "add table" repetido dá erro e abortaria o script inteiro).
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'solicitacoes_entrada'
+  ) then
+    alter publication supabase_realtime add table public.solicitacoes_entrada;
+  end if;
+end
+$$;
 
 -- ========================================================================
 -- RPC (anon): solicitar_entrada
